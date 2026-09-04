@@ -2,54 +2,84 @@
 
 {% block title %}Plans d'adressage — MSSub{% endblock %}
 
-{% macro branch(node) %}
-    {% import _self as tree %}
-    <li>
-        <div class="tree__row">
-            <span class="cidr"><a href="{{ path('app_subnet_show', {id: node.subnet.id}) }}">{{ node.subnet.cidr }}</a></span>
-            <span class="tree__name">{{ node.subnet.name ?? '—' }}</span>
-            {% if node.subnet.status.value == 'container' %}
-                <span class="pill pill--container">{{ node.subnet.status.label }}</span>
-            {% endif %}
-            {% if node.subnet.vlan %}
-                <span class="tree__meta">VLAN {{ node.subnet.vlan.number }}</span>
-            {% endif %}
-            {% if node.subnet.site %}
-                <span class="tree__meta">{{ node.subnet.site.name }}</span>
-            {% endif %}
-        </div>
-        {% if node.children is not empty %}
-            <ul>
-                {% for child in node.children %}
-                    {{ tree.branch(child) }}
-                {% endfor %}
-            </ul>
-        {% endif %}
-    </li>
-{% endmacro %}
-
 {% block body %}
-    {% import _self as tree %}
-
     <div class="page-head">
         <h1>Plans d'adressage</h1>
         <p>Hiérarchie des blocs et des sous-réseaux, par organisation.</p>
     </div>
 
     {% for entry in trees %}
-        <h2 class="section">{{ entry.organization.name }}</h2>
-        {% if entry.roots is empty %}
+        <div class="section-head">
+            <h2 class="section">{{ entry.organization.name }}</h2>
+            {% if entry.rows is not empty %}
+                <div class="section-head__actions no-print">
+                    <button type="button" class="btn btn--quiet btn--small" data-tree-all="expand">Tout déplier</button>
+                    <button type="button" class="btn btn--quiet btn--small" data-tree-all="collapse">Tout plier</button>
+                </div>
+            {% endif %}
+        </div>
+
+        {% if entry.rows is empty %}
             <div class="note">Aucun bloc déclaré pour cette organisation.</div>
         {% else %}
-            <div class="card">
-                <ul class="tree">
-                    {% for root in entry.roots %}
-                        {{ tree.branch(root) }}
+            <div class="table-wrap">
+                <table class="tree-table" data-tree>
+                    <thead>
+                    <tr>
+                        <th>Réseau</th>
+                        <th>Nom</th>
+                        <th>État</th>
+                        <th>VLAN</th>
+                        <th>Site</th>
+                        <th class="col-usage">Occupation</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in entry.rows %}
+                        <tr data-id="{{ row.subnet.id }}"
+                            data-parent="{{ row.parentId ?? '' }}"
+                            data-depth="{{ row.depth }}">
+                            <td class="cidr">
+                                <span class="tree-cell" style="padding-left: {{ row.depth * 18 }}px">
+                                    {% if row.hasChildren %}
+                                        <button type="button" class="tree-toggle no-print"
+                                                aria-expanded="true"
+                                                aria-label="Plier ou déplier {{ row.subnet.cidr }}">▾</button>
+                                    {% else %}
+                                        <span class="tree-toggle tree-toggle--leaf" aria-hidden="true"></span>
+                                    {% endif %}
+                                    <a href="{{ path('app_subnet_show', {id: row.subnet.id}) }}">{{ row.subnet.cidr }}</a>
+                                </span>
+                            </td>
+                            <td class="reason">{{ row.subnet.name ?? '—' }}</td>
+                            <td>
+                                <span class="pill pill--{{ row.subnet.status.value == 'container' ? 'container' : (row.subnet.status.value == 'reserved' ? 'reserved' : 'used') }}">
+                                    {{ row.subnet.status.label }}
+                                </span>
+                            </td>
+                            <td class="muted">{{ row.subnet.vlan ? row.subnet.vlan.number : '—' }}</td>
+                            <td class="muted">{{ row.subnet.site ? row.subnet.site.name : '—' }}</td>
+                            <td class="col-usage">
+                                {% if row.usage %}
+                                    <div class="usage">
+                                        <div class="gauge">
+                                            <div class="gauge__fill" style="width: {{ min(row.usage.percent, 100) }}%"></div>
+                                        </div>
+                                        <span class="usage__text">{{ row.usage.used }}/{{ row.usage.usable }}</span>
+                                    </div>
+                                {% else %}
+                                    <span class="muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
                     {% endfor %}
-                </ul>
+                    </tbody>
+                </table>
             </div>
         {% endif %}
     {% else %}
         <div class="note">Aucune organisation déclarée.</div>
     {% endfor %}
+
+    <script src="{{ asset('tree.js') }}" defer></script>
 {% endblock %}

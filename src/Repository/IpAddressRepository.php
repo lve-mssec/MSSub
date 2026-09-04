@@ -74,6 +74,33 @@ class IpAddressRepository extends ServiceEntityRepository
         return $addresses;
     }
 
+    /**
+     * Nombre d'adresses occupees, pour tous les reseaux d'un coup.
+     *
+     * Une seule requete groupee plutot qu'un comptage par ligne : l'arborescence
+     * affiche l'occupation de chaque reseau, et un plan un peu fourni ferait
+     * sinon plusieurs centaines d'allers-retours.
+     *
+     * @return array<int, int> identifiant de reseau => nombre d'adresses occupees
+     */
+    public function countTakenGroupedBySubnet(): array
+    {
+        $rows = $this->createQueryBuilder('a')
+            ->select('IDENTITY(a.subnet) AS subnetId, COUNT(a.id) AS total')
+            ->andWhere('a.status != :free')
+            ->setParameter('free', IpStatus::Free->value)
+            ->groupBy('a.subnet')
+            ->getQuery()
+            ->getArrayResult();
+
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[(int) $row['subnetId']] = (int) $row['total'];
+        }
+
+        return $counts;
+    }
+
     public function countBySubnet(Subnet $subnet): int
     {
         return (int) $this->createQueryBuilder('a')

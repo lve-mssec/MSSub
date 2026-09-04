@@ -364,3 +364,57 @@ input:focus, select:focus { outline: 2px solid var(--orange-bright); outline-off
     body { background: #FFF; }
     table { border-color: #DDD; }
 }
+
+/* ---------- Arborescence en tableau ---------- */
+
+/*
+ * Le zébrage par défaut vient de nth-child, valable tant que rien n'est plié.
+ * Dès que le script prend la main, il pose lui-même la classe sur une ligne
+ * visible sur deux : une ligne masquée compte toujours dans nth-child et
+ * décalerait l'alternance.
+ */
+.tree-table.js-striped tbody tr { background: var(--card); }
+.tree-table.js-striped tbody tr.is-alt { background: var(--paper); }
+
+.tree-table td { vertical-align: middle; }
+
+/* Le sélecteur d'attribut l'emporte déjà sur `tr` dans la feuille du
+   navigateur, mais l'écrire ici met le repli à l'abri d'une règle future. */
+.tree-table tbody tr[hidden] { display: none; }
+
+.tree-cell { display: flex; align-items: center; gap: 6px; }
+
+.tree-toggle {
+    flex: 0 0 16px;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    line-height: 1;
+    font-size: 10px;
+    color: var(--text-3);
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+
+.tree-toggle:hover { color: var(--orange); }
+
+/* Une feuille garde la gouttière, pour que les CIDR restent alignés. */
+.tree-toggle--leaf { cursor: default; }
+
+.section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.section-head .section { flex: 1; }
+.section-head__actions { display: flex; gap: 6px; flex: 0 0 auto; }
+
+.btn--small { padding: 3px 10px; font-size: 12px; }
+
+.col-usage { width: 190px; }
+
+.usage { display: flex; align-items: center; gap: 8px; }
+.usage__text { font-family: var(--mono); font-size: 12px; color: var(--text-3); white-space: nowrap; }

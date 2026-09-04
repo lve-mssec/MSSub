@@ -10,6 +10,7 @@ use App\Repository\IpAddressRepository;
 use App\Repository\OrganizationRepository;
 use App\Repository\SubnetRepository;
 use App\Service\AllocationService;
+use App\Service\IpAllocator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -17,24 +18,72 @@ use Symfony\Component\Routing\Attribute\Route;
 final class SubnetController extends AbstractController
 {
     #[Route('/reseaux', name: 'app_subnet_index')]
-    public function index(OrganizationRepository $organizations, SubnetRepository $subnets): Response
-    {
+    public function index(
+        OrganizationRepository $organizations,
+        SubnetRepository $subnets,
+        IpAddressRepository $addresses,
+        IpAllocator $ipAllocator,
+    ): Response {
+        // Une seule requete pour toute l'occupation : l'arborescence peut
+        // compter des centaines de lignes, un comptage par ligne serait ruineux.
+        $taken = $addresses->countTakenGroupedBySubnet();
+
         $trees = [];
         foreach ($organizations->findBy([], ['name' => 'ASC']) as $organization) {
             \assert($organization instanceof Organization);
-            $trees[] = [
-                'organization' => $organization,
-                'roots' => array_map(
-                    fn (Subnet $root): array => $this->buildTree($root, $subnets),
-                    $subnets->findRoots($organization),
-                ),
-            ];
+
+            $rows = [];
+            foreach ($subnets->findRoots($organization) as $root) {
+                $this->flatten($root, 0, null, $subnets, $taken, $ipAllocator, $rows);
+            }
+
+            $trees[] = ['organization' => $organization, 'rows' => $rows];
         }
 
         return $this->render('subnet/index.html.twig', [
             'nav' => 'subnets',
             'trees' => $trees,
         ]);
+    }
+
+    /**
+     * Aplatit l'arborescence en lignes de tableau.
+     *
+     * Un tableau plutot que des listes imbriquees : c'est la seule facon
+     * d'obtenir un zebrage continu, la parite d'une liste imbriquee repartant a
+     * zero a chaque niveau. La profondeur est portee par la ligne, et
+     * l'indentation la restitue.
+     *
+     * @param array<int, int>                 $taken
+     * @param list<array<string, mixed>>      $rows
+     */
+    private function flatten(
+        Subnet $node,
+        int $depth,
+        ?int $parentId,
+        SubnetRepository $subnets,
+        array $taken,
+        IpAllocator $ipAllocator,
+        array &$rows,
+    ): void {
+        $children = $subnets->findChildren($node);
+        $used = $taken[$node->getId()] ?? 0;
+
+        $rows[] = [
+            'subnet' => $node,
+            'depth' => $depth,
+            'parentId' => $parentId,
+            'hasChildren' => [] !== $children,
+            'usage' => $node->isContainer() ? null : $ipAllocator->usage(
+                (string) $node->getNetworkAddress(),
+                $node->getPrefixLength(),
+                $used,
+            ),
+        ];
+
+        foreach ($children as $child) {
+            $this->flatten($child, $depth + 1, $node->getId(), $subnets, $taken, $ipAllocator, $rows);
+        }
     }
 
     #[Route('/reseaux/{id}', name: 'app_subnet_show', requirements: ['id' => '\d+'])]
@@ -62,20 +111,6 @@ final class SubnetController extends AbstractController
             'freeAddresses' => $isContainer ? [] : $allocation->freeAddressesIn($subnet, 5),
             'freeBlocks' => $isContainer ? $this->suggestBlocks($subnet, $allocation) : [],
         ]);
-    }
-
-    /**
-     * @return array{subnet: Subnet, children: list<array<string, mixed>>}
-     */
-    private function buildTree(Subnet $node, SubnetRepository $subnets): array
-    {
-        return [
-            'subnet' => $node,
-            'children' => array_map(
-                fn (Subnet $child): array => $this->buildTree($child, $subnets),
-                $subnets->findChildren($node),
-            ),
-        ];
     }
 
     /**
