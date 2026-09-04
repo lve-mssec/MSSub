@@ -1,0 +1,57 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Tableau de bord — MSSub{% endblock %}
+
+{% block body %}
+    <div class="page-head">
+        <h1>Tableau de bord</h1>
+        <p>État du référentiel d'adressage.</p>
+    </div>
+
+    <div class="grid grid--stats">
+        {% for label, value in {
+            'Organisations': counts.organizations,
+            'Sites': counts.sites,
+            'Réseaux': counts.subnets,
+            'Adresses': counts.addresses,
+            'VLAN': counts.vlans,
+            'Équipements': counts.devices
+        } %}
+            <div class="card">
+                <div class="stat__value">{{ value }}</div>
+                <div class="stat__label">{{ label }}</div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <h2 class="section">Blocs de premier niveau</h2>
+
+    {% if blocks is empty %}
+        <div class="note">Aucun bloc déclaré. Le référentiel est vide.</div>
+    {% else %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Organisation</th>
+                    <th>Bloc</th>
+                    <th>Nom</th>
+                    <th>État</th>
+                    <th>Plus grand espace libre</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in blocks %}
+                    <tr>
+                        <td>{{ row.organization.name }}</td>
+                        <td class="cidr"><a href="{{ path('app_subnet_show', {id: row.subnet.id}) }}">{{ row.subnet.cidr }}</a></td>
+                        <td class="reason">{{ row.subnet.name ?? '—' }}</td>
+                        <td><span class="pill pill--{{ row.subnet.status.value == 'container' ? 'container' : 'used' }}">{{ row.subnet.status.label }}</span></td>
+                        <td class="cidr">{{ row.largestFree ?? '—' }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endblock %}

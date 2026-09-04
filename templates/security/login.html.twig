@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Connexion — MSSub</title>
+    <link rel="stylesheet" href="{{ asset('styles/app.css') }}">
+</head>
+<body>
+<div class="login">
+    <div class="login__box">
+        <div class="login__brand">
+            <span class="sidebar__mark"></span>
+            <span>MSSub</span>
+        </div>
+
+        {% if error %}
+            <div class="alert">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
+        {% endif %}
+
+        <form method="post" class="card">
+            <div class="login__field">
+                <label for="username">Identifiant</label>
+                <input type="text" id="username" name="username" value="{{ last_username }}"
+                       autocomplete="username" autofocus required>
+            </div>
+
+            <div class="login__field">
+                <label for="password">Mot de passe</label>
+                <input type="password" id="password" name="password" autocomplete="current-password" required>
+            </div>
+
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+
+            <div class="login__actions">
+                <button class="btn" type="submit">Se connecter</button>
+            </div>
+        </form>
+
+        <p class="login__hint">
+            Comptes annuaire et SSO à venir : seule l'authentification locale est active.
+        </p>
+    </div>
+</div>
+</body>
+</html>

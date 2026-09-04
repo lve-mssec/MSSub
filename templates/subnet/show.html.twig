@@ -1,0 +1,137 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ subnet.cidr }} — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb">
+        <a href="{{ path('app_subnet_index') }}">Plans d'adressage</a>
+        <span>›</span>
+        {{ subnet.organization.name }}
+        {% for ancestor in ancestors %}
+            <span>›</span>
+            <a href="{{ path('app_subnet_show', {id: ancestor.id}) }}">{{ ancestor.cidr }}</a>
+        {% endfor %}
+    </p>
+
+    <div class="page-head">
+        <h1>{{ subnet.cidr }}</h1>
+        <p>{{ subnet.name ?? 'Sans nom' }}{% if subnet.description %} — {{ subnet.description }}{% endif %}</p>
+    </div>
+
+    <div class="grid grid--two">
+        <div class="card">
+            <h2 class="section" style="margin-top:0">Caractéristiques</h2>
+            <table>
+                <tbody>
+                <tr><th>État</th><td>{{ subnet.status.label }}</td></tr>
+                <tr><th>Version</th><td>{{ subnet.version.label }}</td></tr>
+                <tr><th>Plage</th><td class="cidr">{{ subnet.networkAddress }} → {{ subnet.lastAddress }}</td></tr>
+                <tr><th>Site</th><td>{{ subnet.site ? subnet.site.name : '—' }}</td></tr>
+                <tr><th>VLAN</th><td>{{ subnet.vlan ? subnet.vlan : '—' }}</td></tr>
+                <tr><th>Passerelle</th><td class="cidr">{{ subnet.gateway ?? '—' }}</td></tr>
+                <tr><th>DNS</th><td class="cidr">{{ subnet.dnsServers ? subnet.dnsServers|join(', ') : '—' }}</td></tr>
+                <tr>
+                    <th>DHCP</th>
+                    <td>
+                        {% if subnet.dhcpEnabled %}
+                            <span class="cidr">{{ subnet.dhcpRangeStart }} → {{ subnet.dhcpRangeEnd }}</span>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2 class="section" style="margin-top:0">Occupation</h2>
+            {% if usage %}
+                <div class="stat__value">{{ usage.percent }} %</div>
+                <div class="stat__label">{{ usage.used }} adresse{{ usage.used > 1 ? 's' }} sur {{ usage.usable }} attribuables</div>
+                <div class="gauge" style="margin-top:12px">
+                    <div class="gauge__fill" style="width: {{ min(usage.percent, 100) }}%"></div>
+                </div>
+
+                <h2 class="section">Prochaines adresses libres</h2>
+                {% if freeAddresses is empty %}
+                    <div class="note">Ce réseau est plein.</div>
+                {% else %}
+                    <p class="cidr">{{ freeAddresses|join(', ') }}</p>
+                {% endif %}
+            {% else %}
+                <div class="note">
+                    Ce bloc est un conteneur : il accueille des sous-réseaux, pas des adresses.
+                </div>
+
+                {% if freeBlocks is not empty %}
+                    <h2 class="section">Prochains emplacements libres</h2>
+                    <table>
+                        <tbody>
+                        {% for suggestion in freeBlocks %}
+                            <tr>
+                                <th>/{{ suggestion.prefix }}</th>
+                                <td class="cidr">{{ suggestion.cidr }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    {% if children is not empty %}
+        <h2 class="section">Sous-réseaux</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr><th>Réseau</th><th>Nom</th><th>État</th><th>VLAN</th><th>Site</th></tr>
+                </thead>
+                <tbody>
+                {% for child in children %}
+                    <tr>
+                        <td class="cidr"><a href="{{ path('app_subnet_show', {id: child.id}) }}">{{ child.cidr }}</a></td>
+                        <td class="reason">{{ child.name ?? '—' }}</td>
+                        <td><span class="pill pill--{{ child.status.value == 'container' ? 'container' : 'used' }}">{{ child.status.label }}</span></td>
+                        <td>{{ child.vlan ? child.vlan.number : '—' }}</td>
+                        <td>{{ child.site ? child.site.name : '—' }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {% if not subnet.container %}
+        <h2 class="section">Adresses documentées</h2>
+        {% if addresses is empty %}
+            <div class="note">Aucune adresse documentée dans ce réseau.</div>
+        {% else %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr><th>Adresse</th><th>État</th><th>Nom d'hôte</th><th>MAC</th><th>Interface</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for address in addresses %}
+                        <tr>
+                            <td class="cidr">{{ address.address }}</td>
+                            <td>
+                                <span class="pill pill--{{ {
+                                    'used': 'used', 'free': 'free', 'reserved': 'reserved',
+                                    'dhcp': 'dhcp', 'gateway': 'gateway', 'not_applicable': 'na'
+                                }[address.status.value] }}">{{ address.status.label }}</span>
+                            </td>
+                            <td>{{ address.hostname ?? '—' }}</td>
+                            <td class="cidr muted">{{ address.macAddress ?? '—' }}</td>
+                            <td>{{ address.interface ? address.interface : '—' }}</td>
+                            <td class="reason">{{ address.description ?? '—' }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

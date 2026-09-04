@@ -1,0 +1,78 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Rechercher une IP — MSSub{% endblock %}
+
+{% block body %}
+    <div class="page-head">
+        <h1>Rechercher une adresse</h1>
+        <p>Retrouve le réseau qui contient une adresse, et ce qui y est documenté.</p>
+    </div>
+
+    <form method="get" class="card no-print">
+        <div class="search-row">
+            <div>
+                <label for="ip">Adresse IPv4 ou IPv6</label>
+                <input type="search" id="ip" name="ip" value="{{ query }}" placeholder="10.20.30.5" autofocus>
+            </div>
+            <button class="btn" type="submit">Rechercher</button>
+        </div>
+    </form>
+
+    {% if error %}
+        <div class="alert" style="margin-top:16px">{{ error }}</div>
+    {% endif %}
+
+    {% if query and not error %}
+        <h2 class="section">Réseaux contenant {{ query }}</h2>
+        {% if results is empty %}
+            <div class="note">Aucun réseau déclaré ne contient cette adresse.</div>
+        {% else %}
+            {% for result in results %}
+                <div class="card" style="margin-bottom:12px">
+                    <div class="stat__label">{{ result.organization.name }}</div>
+                    <div class="table-wrap" style="margin-top:10px">
+                        <table>
+                            <thead>
+                            <tr><th>Réseau</th><th>Nom</th><th>État</th><th>Site</th></tr>
+                            </thead>
+                            <tbody>
+                            {% for subnet in result.chain %}
+                                <tr>
+                                    <td class="cidr"><a href="{{ path('app_subnet_show', {id: subnet.id}) }}">{{ subnet.cidr }}</a></td>
+                                    <td class="reason">{{ subnet.name ?? '—' }}</td>
+                                    <td><span class="pill pill--{{ subnet.status.value == 'container' ? 'container' : 'used' }}">{{ subnet.status.label }}</span></td>
+                                    <td>{{ subnet.site ? subnet.site.name : '—' }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <h2 class="section">Adresse documentée</h2>
+        {% if documented is empty %}
+            <div class="note">Cette adresse n'est documentée dans aucun réseau.</div>
+        {% else %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr><th>Réseau</th><th>État</th><th>Nom d'hôte</th><th>MAC</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for address in documented %}
+                        <tr>
+                            <td class="cidr"><a href="{{ path('app_subnet_show', {id: address.subnet.id}) }}">{{ address.subnet.cidr }}</a></td>
+                            <td>{{ address.status.label }}</td>
+                            <td>{{ address.hostname ?? '—' }}</td>
+                            <td class="cidr muted">{{ address.macAddress ?? '—' }}</td>
+                            <td class="reason">{{ address.description ?? '—' }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

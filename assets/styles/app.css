@@ -1,3 +1,366 @@
+/*
+ * MSSub — système visuel.
+ *
+ * Les jetons viennent de « Doctrine/charte graphique.md » et ne se redéfinissent
+ * pas ailleurs. Deux surfaces, jamais mélangées : la barre latérale est la seule
+ * surface sombre, la zone de contenu la seule qui s'imprime.
+ */
+
+:root {
+    --orange-bright: #F69235;
+    --orange: #EA7E30;
+    --red: #EE3628;
+    --wash: #FBEEE4;
+    --grad: linear-gradient(135deg, #F69235, #EE3628);
+
+    --ink-900: #0D0C0C;
+    --ink-800: #1A1818;
+    --ink-700: #262323;
+    --ink-600: #373433;
+    --ink-text: #E8E4E2;
+    --ink-muted: #8A8482;
+
+    --paper: #F7F5F4;
+    --card: #FFFFFF;
+    --line: #EDE8E5;
+    --hairline: #F0ECEA;
+    --surface2: #F3EEEC;
+    --text: #302E2E;
+    --text-2: #5B5959;
+    --text-3: #8A8482;
+
+    --sidebar-width: 232px;
+    --radius: 6px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
 body {
-    background-color: skyblue;
+    margin: 0;
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--paper);
+}
+
+/* ---------- Barre latérale : la seule surface sombre ---------- */
+
+.layout { display: flex; min-height: 100vh; }
+
+.sidebar {
+    width: var(--sidebar-width);
+    flex: 0 0 var(--sidebar-width);
+    background: var(--ink-900);
+    color: var(--ink-text);
+    display: flex;
+    flex-direction: column;
+    /* La jonction avec le contenu se fait par le contraste, sans filet. */
+}
+
+.sidebar__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 18px 16px;
+    font-weight: 600;
+    letter-spacing: .02em;
+}
+
+.sidebar__mark {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    background: var(--grad);
+    flex: 0 0 22px;
+}
+
+.sidebar__section {
+    padding: 14px 16px 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--ink-muted);
+}
+
+.sidebar__nav { display: flex; flex-direction: column; padding: 0 8px; }
+
+.sidebar__link {
+    position: relative;
+    display: block;
+    padding: 8px 12px;
+    margin-bottom: 2px;
+    border-radius: var(--radius);
+    color: var(--ink-text);
+    text-decoration: none;
+}
+
+.sidebar__link:hover { background: var(--ink-800); }
+
+.sidebar__link.is-active {
+    background: var(--ink-700);
+    color: #FFF;
+}
+
+/* Le liseré d'accent : petite surface, donc le dégradé y reste propre. */
+.sidebar__link.is-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--grad);
+}
+
+.sidebar__spacer { flex: 1; }
+
+.sidebar__foot {
+    border-top: 1px solid var(--ink-600);
+    margin: 0 8px;
+    padding: 12px 8px;
+    font-size: 12px;
+    color: var(--ink-muted);
+}
+
+.sidebar__user { color: var(--ink-text); display: block; }
+
+.sidebar__logout {
+    color: var(--ink-muted);
+    text-decoration: none;
+    border-bottom: 1px solid var(--ink-600);
+}
+
+.sidebar__logout:hover { color: var(--ink-text); }
+
+/* ---------- Contenu : la surface claire, celle qui s'imprime ---------- */
+
+.content { flex: 1; min-width: 0; padding: 28px 32px 56px; }
+
+.page-head { margin-bottom: 22px; }
+
+.page-head h1 {
+    margin: 0 0 4px;
+    font-size: 21px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.page-head p { margin: 0; color: var(--text-2); }
+
+.breadcrumb { margin: 0 0 10px; font-size: 12px; color: var(--text-3); }
+.breadcrumb a { color: var(--text-2); text-decoration: none; }
+.breadcrumb a:hover { color: var(--orange); }
+
+h2.section {
+    margin: 26px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--orange);
+}
+
+.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+}
+
+.grid { display: grid; gap: 14px; }
+.grid--stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.grid--two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+
+.stat__value { font-size: 26px; font-weight: 600; line-height: 1.1; }
+.stat__label { font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
+
+.note {
+    background: var(--wash);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    color: var(--text-2);
+}
+
+/* ---------- Tableaux ---------- */
+
+.table-wrap { overflow-x: auto; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+th {
+    text-align: left;
+    background: var(--surface2);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-3);
+    padding: 9px 12px;
+    white-space: nowrap;
+}
+
+td { padding: 9px 12px; border-top: 1px solid var(--hairline); vertical-align: top; }
+
+tbody tr:nth-child(even) { background: var(--paper); }
+
+td.muted, .muted { color: var(--text-3); }
+td.reason { color: var(--text-2); }
+
+code, .cidr {
+    font-family: var(--mono);
+    font-size: 13px;
+}
+
+.cidr a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--line); }
+.cidr a:hover { color: var(--orange); border-bottom-color: var(--orange); }
+
+code.inline {
+    background: var(--surface2);
+    border-radius: 3px;
+    padding: 1px 5px;
+}
+
+/* ---------- Pastilles d'état ---------- */
+
+.pill {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+    border: 1px solid;
+}
+
+.pill--used      { background: var(--wash);     border-color: #E7D3C0; color: #8A4B12; }
+.pill--free      { background: #FFFFFF;         border-color: var(--line); color: var(--text-2); }
+.pill--reserved  { background: #FFFFFF;         border-color: #DCD5D0; color: var(--text-2); }
+.pill--dhcp      { background: #FFFFFF;         border-color: #D6CFC9; color: var(--text-2); }
+.pill--gateway   { background: var(--wash);     border-color: #E7D3C0; color: #8A4B12; }
+.pill--na        { background: var(--surface2); border-color: var(--line); color: var(--text-3); }
+.pill--container { background: var(--surface2); border-color: var(--line); color: var(--text-2); }
+
+/* ---------- Arbre des réseaux ---------- */
+
+.tree { list-style: none; margin: 0; padding: 0; }
+.tree ul { list-style: none; margin: 0; padding-left: 20px; border-left: 1px solid var(--hairline); }
+
+.tree li { padding: 3px 0; }
+
+.tree__row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tree__name { color: var(--text-2); }
+.tree__meta { font-size: 12px; color: var(--text-3); }
+
+/* ---------- Jauge d'occupation ---------- */
+
+.gauge {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 90px;
+}
+
+.gauge__fill { height: 100%; background: var(--grad); }
+
+/* ---------- Formulaires ---------- */
+
+label { display: block; font-size: 12px; color: var(--text-3); margin-bottom: 4px; }
+
+input[type="text"], input[type="password"], input[type="search"], select {
+    width: 100%;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+input:focus, select:focus { outline: 2px solid var(--orange-bright); outline-offset: -1px; border-color: var(--orange); }
+
+.btn {
+    display: inline-block;
+    padding: 8px 16px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    color: #FFF;
+    background: var(--orange);
+    border: 1px solid var(--orange);
+    border-radius: var(--radius);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.btn:hover { background: #D9701F; border-color: #D9701F; }
+
+.btn--quiet {
+    color: var(--text-2);
+    background: var(--card);
+    border-color: var(--line);
+}
+
+.btn--quiet:hover { background: var(--surface2); color: var(--text); }
+
+.search-row { display: flex; gap: 10px; align-items: flex-end; }
+.search-row > div { flex: 1; }
+
+.alert {
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    border: 1px solid var(--red);
+    background: var(--wash);
+    color: #96190F;
+}
+
+/* ---------- Page de connexion ---------- */
+
+.login {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--paper);
+    padding: 24px;
+}
+
+.login__box { width: 100%; max-width: 340px; }
+
+.login__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.login__field { margin-bottom: 12px; }
+.login__actions { margin-top: 18px; }
+.login__actions .btn { width: 100%; text-align: center; }
+
+.login__hint { margin-top: 14px; font-size: 12px; color: var(--text-3); }
+
+/* ---------- Impression : seule la surface claire sort ---------- */
+
+@media print {
+    .sidebar, .no-print { display: none; }
+    .content { padding: 0; }
+    body { background: #FFF; }
+    table { border-color: #DDD; }
 }

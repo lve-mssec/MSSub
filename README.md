@@ -18,6 +18,21 @@ docker compose exec app php bin/console doctrine:migrations:migrate
 | `db` | `localhost:13306` | MariaDB 11.4 |
 | `adminer` | http://localhost:8081 | inspection de la base |
 
+## Se connecter
+
+Charger le jeu de démonstration, puis ouvrir http://localhost:8080 :
+
+```bash
+docker compose exec app php bin/console doctrine:fixtures:load
+```
+
+Compte de démonstration : `loic` / `MotDePasseDeTest2026` — **développement uniquement**.
+Pour un compte réel :
+
+```bash
+docker compose exec app php bin/console app:user:create <identifiant> --admin
+```
+
 ## Tests
 
 ```bash

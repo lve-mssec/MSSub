@@ -1,11 +1,13 @@
-# Enable stateless CSRF protection for forms and logins/logouts
+# Protection CSRF classique, adossée à la session.
+#
+# Symfony 7.4 propose par défaut un jeton « sans état » dont la valeur réelle
+# est calculée en JavaScript dans le navigateur. MSSub est rendu côté serveur et
+# ne charge aucun script : ce mécanisme rendrait la page de connexion dépendante
+# d'un JS absent — donc inutilisable. Et une session existe de toute façon dès
+# qu'un utilisateur est authentifié : le gain du sans-état serait nul ici.
 framework:
+    csrf_protection:
+        enabled: true
     form:
         csrf_protection:
-            token_id: submit
-
-    csrf_protection:
-        stateless_token_ids:
-            - submit
-            - authenticate
-            - logout
+            enabled: true
