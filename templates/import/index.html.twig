@@ -1,0 +1,130 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Import — MSSub{% endblock %}
+
+{% block body %}
+    <div class="page-head">
+        <h1>Import</h1>
+        <p>Charger un plan d'adressage existant, au format CSV ou XLSX.</p>
+    </div>
+
+    {% if error %}
+        <div class="alert">{{ error }}</div>
+    {% endif %}
+
+    <div class="form-column">
+        <form method="post" enctype="multipart/form-data" class="card">
+            <input type="hidden" name="_token" value="{{ csrf_token('import') }}">
+
+            <div class="field">
+                <label for="type">Contenu du fichier</label>
+                <select id="type" name="type">
+                    <option value="reseaux" {{ kind == 'reseaux' ? 'selected' }}>Réseaux</option>
+                    <option value="adresses" {{ kind == 'adresses' ? 'selected' }}>Adresses</option>
+                </select>
+            </div>
+
+            {% if organizations|length > 1 %}
+                <div class="field">
+                    <label for="organisation">Organisation</label>
+                    <select id="organisation" name="organisation">
+                        {% for organization in organizations %}
+                            <option value="{{ organization.id }}">{{ organization.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% elseif organizations|length == 1 %}
+                <input type="hidden" name="organisation" value="{{ organizations|first.id }}">
+            {% endif %}
+
+            <div class="field">
+                <label for="fichier">Fichier</label>
+                <input type="file" id="fichier" name="fichier" accept=".csv,.xlsx,.xls,.ods" required>
+                <p class="field__help">
+                    Colonnes reconnues pour les réseaux : <code class="inline">cidr</code>,
+                    <code class="inline">nom</code>, <code class="inline">statut</code>,
+                    <code class="inline">site</code>, <code class="inline">vlan</code>,
+                    <code class="inline">passerelle</code>, <code class="inline">dns</code>,
+                    <code class="inline">dhcp</code>, <code class="inline">description</code>.
+                    Pour les adresses : <code class="inline">adresse</code>,
+                    <code class="inline">nom_hote</code>, <code class="inline">statut</code>,
+                    <code class="inline">mac</code>, <code class="inline">description</code>.
+                    Les intitulés courants sont reconnus (« Réseau », « Hostname », « Commentaire »…).
+                </p>
+            </div>
+
+            <div class="note">
+                Le bouton <strong>Simuler</strong> ne modifie rien : il lit le fichier et
+                dit ce qui se passerait. L'écriture est refusée tant qu'une erreur subsiste
+                — importer la moitié d'un fichier laisserait le référentiel dans un état
+                que personne ne saurait décrire.
+            </div>
+
+            <div class="form-actions">
+                <button class="btn" type="submit">Simuler</button>
+                <button class="btn btn--quiet" type="submit" name="appliquer" value="1">Importer réellement</button>
+            </div>
+        </form>
+    </div>
+
+    {% if report %}
+        <h2 class="section">
+            {{ report.dryRun ? 'Résultat de la simulation' : 'Résultat de l’import' }}
+        </h2>
+
+        <div class="grid grid--stats">
+            <div class="card">
+                <div class="stat__value">{{ report.created }}</div>
+                <div class="stat__label">{{ report.dryRun ? 'à créer' : 'créés' }}</div>
+            </div>
+            <div class="card">
+                <div class="stat__value">{{ report.updated }}</div>
+                <div class="stat__label">{{ report.dryRun ? 'à mettre à jour' : 'mis à jour' }}</div>
+            </div>
+            <div class="card">
+                <div class="stat__value">{{ report.unchanged }}</div>
+                <div class="stat__label">inchangés</div>
+            </div>
+            <div class="card">
+                <div class="stat__value">{{ report.errors|length }}</div>
+                <div class="stat__label">erreurs</div>
+            </div>
+        </div>
+
+        {% if report.errors is not empty %}
+            <h2 class="section">Erreurs — aucune écriture tant qu'elles subsistent</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Ligne</th><th>Valeur</th><th>Motif</th></tr></thead>
+                    <tbody>
+                    {% for issue in report.errors %}
+                        <tr>
+                            <td class="muted">{{ issue.line }}</td>
+                            <td class="cidr">{{ issue.value ?: '—' }}</td>
+                            <td class="reason">{{ issue.message }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+        {% if report.warnings is not empty %}
+            <h2 class="section">Avertissements — sans effet sur l'import</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Ligne</th><th>Valeur</th><th>Motif</th></tr></thead>
+                    <tbody>
+                    {% for issue in report.warnings %}
+                        <tr>
+                            <td class="muted">{{ issue.line }}</td>
+                            <td class="cidr">{{ issue.value ?: '—' }}</td>
+                            <td class="reason">{{ issue.message }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

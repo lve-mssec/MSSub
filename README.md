@@ -48,6 +48,22 @@ docker compose exec -T db mariadb -uroot -proot < docker/mariadb/init/02-test-da
 docker compose exec app php bin/console --env=test doctrine:schema:create
 ```
 
+## Import et export
+
+L'export CSV utilise les colonnes que l'import sait relire : un plan exporté,
+retouché dans un tableur, se recharge sans rien perdre. Les intitulés courants
+sont reconnus à l'import (« Réseau », « Hostname », « Commentaire »…).
+
+L'import se fait en deux temps : **Simuler** lit le fichier et décrit ce qui se
+passerait sans rien écrire ; **Importer réellement** n'écrit que si aucune
+erreur ne subsiste. Les avertissements — statut, site ou VLAN inconnu — ne
+bloquent pas et sont listés à part.
+
+Les exports DNS et DHCP sont des **fragments à inclure**, pas des fichiers
+complets : ni SOA, ni NS, ni options globales de dhcpd. Ces éléments
+appartiennent à l'infrastructure, et les inventer produirait un fichier
+d'apparence valide qui écraserait la configuration réelle.
+
 ## Conventions
 
 Le stockage des adresses IP, la hiérarchie des sous-réseaux et le découpage des

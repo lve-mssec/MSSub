@@ -1,0 +1,53 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Export — MSSub{% endblock %}
+
+{% block body %}
+    <div class="page-head">
+        <h1>Export</h1>
+        <p>Extraire le référentiel, ou alimenter DNS et DHCP.</p>
+    </div>
+
+    {% for organization in organizations %}
+        <h2 class="section">{{ organization.name }}</h2>
+
+        <div class="grid grid--two">
+            <div class="card">
+                <h3 class="card__title">Référentiel</h3>
+                <p class="muted">
+                    Colonnes identiques à celles que l'import sait relire : un export
+                    peut servir de gabarit de saisie et revenir tel quel.
+                </p>
+                <div class="form-actions" style="border:0; padding:0; margin-top:12px">
+                    <a class="btn btn--quiet" href="{{ path('app_export_subnets', {id: organization.id}) }}">Réseaux (CSV)</a>
+                    <a class="btn btn--quiet" href="{{ path('app_export_addresses', {id: organization.id}) }}">Adresses (CSV)</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="card__title">DNS et DHCP</h3>
+                <p class="muted">
+                    Fragments à inclure, pas des fichiers complets : ni SOA, ni NS, ni
+                    options globales — ils appartiennent à l'infrastructure, et les
+                    inventer ici écraserait sa configuration.
+                </p>
+                {# Un seul formulaire : chaque bouton porte sa propre destination
+                   via formaction, et le domaine saisi vaut pour les deux. #}
+                <form method="get">
+                    <div class="field">
+                        <label for="domaine-{{ organization.id }}">Domaine</label>
+                        <input type="text" id="domaine-{{ organization.id }}" name="domaine" value="mssec.local">
+                    </div>
+                    <div class="form-actions" style="border:0; padding:0">
+                        <button class="btn btn--quiet" type="submit"
+                                formaction="{{ path('app_export_dns', {id: organization.id}) }}">Zone DNS directe</button>
+                        <button class="btn btn--quiet" type="submit"
+                                formaction="{{ path('app_export_dhcp', {id: organization.id}) }}">Configuration dhcpd</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% else %}
+        <div class="note">Aucune organisation déclarée.</div>
+    {% endfor %}
+{% endblock %}

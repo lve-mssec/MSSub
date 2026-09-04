@@ -521,3 +521,23 @@ textarea:focus { outline: 2px solid var(--orange-bright); outline-offset: -1px; 
     gap: 12px;
     margin-top: 14px;
 }
+
+.card__title {
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.export-form { margin-bottom: 4px; }
+
+input[type="file"] {
+    width: 100%;
+    padding: 7px 10px;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-2);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}

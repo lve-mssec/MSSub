@@ -24,6 +24,14 @@
                href="{{ path('app_search') }}">Rechercher une IP</a>
         </div>
 
+        <div class="sidebar__section">Données</div>
+        <div class="sidebar__nav">
+            <a class="sidebar__link {{ nav is defined and nav == 'import' ? 'is-active' }}"
+               href="{{ path('app_import') }}">Import</a>
+            <a class="sidebar__link {{ nav is defined and nav == 'export' ? 'is-active' }}"
+               href="{{ path('app_export') }}">Export</a>
+        </div>
+
         <div class="sidebar__section">Traçabilité</div>
         <div class="sidebar__nav">
             <a class="sidebar__link {{ nav is defined and nav == 'audit' ? 'is-active' }}"
