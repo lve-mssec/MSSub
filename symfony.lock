@@ -47,9 +47,6 @@
             "migrations/.gitignore"
         ]
     },
-    "knpuniversity/oauth2-client-bundle": {
-        "version": "v2.20.2"
-    },
     "phpunit/phpunit": {
         "version": "12.5",
         "recipe": {

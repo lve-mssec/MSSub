@@ -47,6 +47,23 @@ services:
     depends_on:
       - db
 
+  # Annuaire de développement, démarré à la demande :
+  #   docker compose --profile annuaire up -d
+  # Il n'a aucune raison de tourner en permanence, mais sans lui le code LDAP
+  # ne serait jamais exécuté avant d'arriver chez un client.
+  annuaire:
+    image: osixia/openldap:1.5.0
+    profiles: ["annuaire"]
+    command: ["--copy-service"]
+    environment:
+      LDAP_ORGANISATION: MSSEC
+      LDAP_DOMAIN: mssec.local
+      LDAP_ADMIN_PASSWORD: adminpass
+    volumes:
+      - ./docker/openldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-mssub.ldif:ro
+    ports:
+      - "1389:389"
+
 volumes:
   db_data:
 

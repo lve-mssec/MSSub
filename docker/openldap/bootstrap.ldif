@@ -1,0 +1,42 @@
+# Annuaire de développement pour MSSub.
+#
+# Deux comptes et deux groupes suffisent à exercer ce qui compte : le bind
+# utilisateur, la recherche par uid, et la traduction d'appartenance de groupe
+# en rôle applicatif. Les mots de passe sont en clair : c'est un conteneur
+# jetable, qui n'a aucune vocation à sortir d'un poste de développement.
+
+dn: ou=users,dc=mssec,dc=local
+objectClass: organizationalUnit
+ou: users
+
+dn: ou=groups,dc=mssec,dc=local
+objectClass: organizationalUnit
+ou: groups
+
+dn: uid=jdupont,ou=users,dc=mssec,dc=local
+objectClass: inetOrgPerson
+uid: jdupont
+cn: Jean Dupont
+sn: Dupont
+givenName: Jean
+mail: jean.dupont@mssec.local
+userPassword: motdepasse1
+
+dn: uid=mmartin,ou=users,dc=mssec,dc=local
+objectClass: inetOrgPerson
+uid: mmartin
+cn: Marie Martin
+sn: Martin
+givenName: Marie
+mail: marie.martin@mssec.local
+userPassword: motdepasse2
+
+dn: cn=mssub-admins,ou=groups,dc=mssec,dc=local
+objectClass: groupOfNames
+cn: mssub-admins
+member: uid=jdupont,ou=users,dc=mssec,dc=local
+
+dn: cn=mssub-operateurs,ou=groups,dc=mssec,dc=local
+objectClass: groupOfNames
+cn: mssub-operateurs
+member: uid=mmartin,ou=users,dc=mssec,dc=local

@@ -48,6 +48,36 @@ docker compose exec -T db mariadb -uroot -proot < docker/mariadb/init/02-test-da
 docker compose exec app php bin/console --env=test doctrine:schema:create
 ```
 
+## Authentification
+
+Trois sources cohabitent, toutes désactivées sauf la première :
+
+- **Comptes locaux** — `app:user:create`, hachage Argon2id. C'est le compte de
+  secours : il reste utilisable quand l'annuaire ou le SSO sont indisponibles.
+- **LDAP / Active Directory** — `LDAP_ENABLED=true` dans `.env.local`. Le mot de
+  passe n'est jamais comparé par MSSub : c'est l'annuaire qui tranche, par un
+  bind. Rien n'est stocké en base pour ces comptes.
+- **OIDC** — `OIDC_ENABLED=true` et les points d'entrée du fournisseur. Testé
+  avec un flux code d'autorisation ; l'URL de retour à déclarer côté fournisseur
+  est `https://<hôte>/connexion/sso/retour`.
+
+Les comptes locaux et d'annuaire partagent le **même formulaire** : personne n'a
+à savoir où vit son compte. Un compte SSO refuse en revanche le mot de passe —
+accepter une seconde voie d'entrée viderait la délégation de son sens.
+
+Les rôles viennent des groupes, via `APP_ROLE_MAP` (nom court du groupe, casse
+ignorée). Un groupe inconnu n'interdit pas l'accès : il donne la lecture seule.
+
+### Annuaire de développement
+
+```bash
+docker compose --profile annuaire up -d
+```
+
+Deux comptes : `jdupont` / `motdepasse1` (groupe `mssub-admins`) et `mmartin` /
+`motdepasse2` (groupe `mssub-operateurs`). Les tests LDAP s'ignorent d'eux-mêmes
+si ce conteneur n'est pas démarré.
+
 ## Import et export
 
 L'export CSV utilise les colonnes que l'import sait relire : un plan exporté,

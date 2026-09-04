@@ -14,6 +14,10 @@
             <span>MSSub</span>
         </div>
 
+        {% for message in app.flashes('error') %}
+            <div class="alert">{{ message }}</div>
+        {% endfor %}
+
         {% if error %}
             <div class="alert">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
         {% endif %}
@@ -37,8 +41,21 @@
             </div>
         </form>
 
+        {% if oidc_enabled %}
+            <div class="login__sso">
+                <span class="login__separator">ou</span>
+                <a class="btn btn--quiet" href="{{ path('app_oidc_start') }}">
+                    Se connecter avec {{ oidc_label }}
+                </a>
+            </div>
+        {% endif %}
+
         <p class="login__hint">
-            Comptes annuaire et SSO à venir : seule l'authentification locale est active.
+            {% if ldap_enabled %}
+                Comptes locaux et comptes d'annuaire acceptés sur le même formulaire.
+            {% else %}
+                Authentification locale.
+            {% endif %}
         </p>
     </div>
 </div>

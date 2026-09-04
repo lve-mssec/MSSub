@@ -541,3 +541,13 @@ input[type="file"] {
     border: 1px solid var(--line);
     border-radius: var(--radius);
 }
+
+.login__sso { margin-top: 16px; text-align: center; }
+.login__sso .btn { width: 100%; text-align: center; }
+
+.login__separator {
+    display: block;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--text-3);
+}

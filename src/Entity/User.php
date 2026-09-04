@@ -117,8 +117,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
-     * Aucun secret en clair n'est conserve sur l'objet, il n'y a donc rien a effacer.
+     * Aucun secret en clair n'est conserve sur l'objet : il n'y a rien a effacer.
+     *
+     * L'attribut signale a Symfony que ce vide est delibere et non un oubli —
+     * sans lui, la version 7.3 emet une deprecation a chaque authentification.
      */
+    #[\Deprecated]
     public function eraseCredentials(): void
     {
     }

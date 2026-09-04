@@ -31,8 +31,12 @@ final class AuditListener
     /** Ce qui n'a pas à figurer dans un journal, jamais. */
     private const REDACTED = ['password'];
 
-    /** Bruit d'horodatage : le journal porte déjà sa propre date. */
-    private const IGNORED = ['createdAt', 'updatedAt'];
+    /**
+     * Bruit d'horodatage : le journal porte déjà sa propre date, et la dernière
+     * connexion fait l'objet de sa propre ligne — la tracer deux fois noierait
+     * les modifications réelles sous les connexions.
+     */
+    private const IGNORED = ['createdAt', 'updatedAt', 'lastLoginAt'];
 
     /** @var list<array{log: AuditLog, entity: object|null}> */
     private array $pending = [];

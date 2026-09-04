@@ -10,7 +10,6 @@
         "doctrine/doctrine-bundle": "^2.19",
         "doctrine/doctrine-migrations-bundle": "^3.7",
         "doctrine/orm": "^3.6",
-        "knpuniversity/oauth2-client-bundle": "^2.20",
         "league/csv": "^9.28",
         "league/oauth2-client": "^2.9",
         "phpoffice/phpspreadsheet": "^5.9",

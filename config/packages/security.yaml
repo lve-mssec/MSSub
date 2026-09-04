@@ -21,13 +21,11 @@ security:
             # Un compte desactive ne doit pas pouvoir entrer, quelle que soit sa
             # source d'authentification : le controle est donc au niveau du pare-feu.
             user_checker: App\Security\UserChecker
-            form_login:
-                login_path: app_login
-                check_path: app_login
-                username_parameter: username
-                password_parameter: password
-                enable_csrf: true
-                default_target_path: app_dashboard
+            # Un authentificateur maison plutôt que form_login : le même
+            # formulaire doit servir les comptes locaux et les comptes
+            # d'annuaire, ce que form_login et form_login_ldap ne savent pas
+            # faire ensemble — tous deux répondent à la même requête.
+            custom_authenticator: App\Security\LoginAuthenticator
             logout:
                 path: app_logout
                 target: app_login
