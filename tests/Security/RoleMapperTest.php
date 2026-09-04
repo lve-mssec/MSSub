@@ -11,6 +11,8 @@ use Psr\Log\NullLogger;
 
 final class RoleMapperTest extends TestCase
 {
+    use EmptySettingsTrait;
+
     private const MAP = [
         'mssub-admins' => 'ROLE_ADMIN',
         'MSSub-Operateurs' => 'ROLE_OPERATOR',
@@ -18,7 +20,7 @@ final class RoleMapperTest extends TestCase
 
     public function testGroupsBecomeRoles(): void
     {
-        $mapper = new RoleMapper(new NullLogger(), self::MAP);
+        $mapper = new RoleMapper(new NullLogger(), $this->emptySettings(), self::MAP);
 
         self::assertSame(['ROLE_ADMIN', User::ROLE_USER], $mapper->rolesFor(['mssub-admins']));
     }
@@ -26,7 +28,7 @@ final class RoleMapperTest extends TestCase
     /** Un annuaire ne garantit pas la casse d'un nom de groupe. */
     public function testMatchingIgnoresCase(): void
     {
-        $mapper = new RoleMapper(new NullLogger(), self::MAP);
+        $mapper = new RoleMapper(new NullLogger(), $this->emptySettings(), self::MAP);
 
         self::assertSame(['ROLE_OPERATOR', User::ROLE_USER], $mapper->rolesFor(['MSSUB-OPERATEURS']));
         self::assertSame(['ROLE_ADMIN', User::ROLE_USER], $mapper->rolesFor(['MSSub-Admins']));
@@ -39,7 +41,7 @@ final class RoleMapperTest extends TestCase
      */
     public function testUnknownGroupsFallBackToReadOnly(): void
     {
-        $mapper = new RoleMapper(new NullLogger(), self::MAP);
+        $mapper = new RoleMapper(new NullLogger(), $this->emptySettings(), self::MAP);
 
         self::assertSame([User::ROLE_USER], $mapper->rolesFor(['comptabilite', 'tout-le-monde']));
         self::assertSame([User::ROLE_USER], $mapper->rolesFor([]));
@@ -47,7 +49,7 @@ final class RoleMapperTest extends TestCase
 
     public function testDuplicateRolesAreCollapsed(): void
     {
-        $mapper = new RoleMapper(new NullLogger(), ['a' => 'ROLE_ADMIN', 'b' => 'ROLE_ADMIN']);
+        $mapper = new RoleMapper(new NullLogger(), $this->emptySettings(), ['a' => 'ROLE_ADMIN', 'b' => 'ROLE_ADMIN']);
 
         self::assertSame(['ROLE_ADMIN', User::ROLE_USER], $mapper->rolesFor(['a', 'b']));
     }
@@ -55,7 +57,7 @@ final class RoleMapperTest extends TestCase
     /** Sans correspondance configurée, personne n'obtient de privilège. */
     public function testEmptyMapGrantsNothingExtra(): void
     {
-        $mapper = new RoleMapper(new NullLogger(), []);
+        $mapper = new RoleMapper(new NullLogger(), $this->emptySettings(), []);
 
         self::assertSame([User::ROLE_USER], $mapper->rolesFor(['mssub-admins']));
     }

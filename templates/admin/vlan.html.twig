@@ -1,0 +1,44 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}VLAN — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb"><a href="{{ path('app_admin') }}">Administration</a> <span>›</span> VLAN</p>
+
+    <div class="page-head page-head--with-action">
+        <div>
+            <h1>VLAN</h1>
+            <p>Référentiel des domaines de diffusion. L'unicité du numéro se joue au sein d'un site.</p>
+        </div>
+        <a class="btn no-print" href="{{ path('app_admin_vlan_new') }}">Nouveau VLAN</a>
+    </div>
+
+    {% if rows is empty %}
+        <div class="note">Aucun VLAN déclaré.</div>
+    {% else %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Numéro</th><th>Nom</th><th>Site</th><th>Réseaux</th><th>Description</th><th class="no-print"></th></tr></thead>
+                <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td class="cidr">{{ row.vlan.number }}</td>
+                        <td>{{ row.vlan.name }}</td>
+                        <td class="muted">{{ row.vlan.site ? row.vlan.site.name : 'transverse' }}</td>
+                        <td class="muted">{{ row.subnets }}</td>
+                        <td class="reason">{{ row.vlan.description ?? '—' }}</td>
+                        <td class="row-actions no-print">
+                            <a href="{{ path('app_admin_vlan_edit', {id: row.vlan.id}) }}">Modifier</a>
+                            <form method="post" action="{{ path('app_admin_vlan_delete', {id: row.vlan.id}) }}"
+                                  onsubmit="return confirm('Supprimer le VLAN {{ row.vlan.number }} ?');">
+                                <input type="hidden" name="_token" value="{{ csrf_token('supprimer-vlan-' ~ row.vlan.id) }}">
+                                <button type="submit">Supprimer</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endblock %}

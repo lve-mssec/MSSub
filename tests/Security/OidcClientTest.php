@@ -16,6 +16,8 @@ use PHPUnit\Framework\TestCase;
  */
 final class OidcClientTest extends TestCase
 {
+    use EmptySettingsTrait;
+
     public function testConfiguredClaimWinsOverTheFallbacks(): void
     {
         $client = $this->client(usernameClaim: 'upn');
@@ -77,16 +79,17 @@ final class OidcClientTest extends TestCase
         string $groupsClaim = 'groups',
     ): OidcClient {
         return new OidcClient(
-            enabled: $enabled,
-            clientId: $clientId,
-            clientSecret: 'secret',
-            authorizationUrl: 'https://idp.example/authorize',
-            tokenUrl: 'https://idp.example/token',
-            userInfoUrl: 'https://idp.example/userinfo',
-            scopes: 'openid profile email',
-            label: '',
-            usernameClaim: $usernameClaim,
-            groupsClaim: $groupsClaim,
+            settings: $this->emptySettings(),
+            envEnabled: $enabled,
+            envClientId: $clientId,
+            envClientSecret: 'secret',
+            envAuthorizationUrl: 'https://idp.example/authorize',
+            envTokenUrl: 'https://idp.example/token',
+            envUserInfoUrl: 'https://idp.example/userinfo',
+            envScopes: 'openid profile email',
+            envLabel: '',
+            envUsernameClaim: $usernameClaim,
+            envGroupsClaim: $groupsClaim,
         );
     }
 }

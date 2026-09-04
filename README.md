@@ -48,6 +48,31 @@ docker compose exec -T db mariadb -uroot -proot < docker/mariadb/init/02-test-da
 docker compose exec app php bin/console --env=test doctrine:schema:create
 ```
 
+## Administration
+
+Tout ce qui se configurait par variables d'environnement se règle désormais
+depuis le portail, sous **Administration** (réservé à `ROLE_ADMIN`) :
+organisations, sites, VLAN, équipements et interfaces, comptes, et les
+paramètres d'authentification.
+
+Les paramètres suivent trois niveaux, du plus fort au plus faible : **la base**,
+puis **la variable d'environnement**, puis le défaut du code. Une installation
+neuve fonctionne donc sans qu'aucun écran n'ait été rempli, et vider un champ
+rend la main à la configuration de déploiement.
+
+Les secrets — mot de passe du compte de service LDAP, secret client OIDC — sont
+chiffrés en base (XSalsa20-Poly1305) avec une clé dérivée de `APP_SECRET`, et
+ne sont jamais renvoyés au navigateur. **Changer `APP_SECRET` les rend
+illisibles** : l'application retombe alors sur les variables d'environnement et
+il faut les ressaisir.
+
+Si l'administration devient inaccessible — plus aucun compte administrateur —
+la porte de secours reste la ligne de commande :
+
+```bash
+docker compose exec app php bin/console app:user:create <identifiant> --admin
+```
+
 ## Authentification
 
 Trois sources cohabitent, toutes désactivées sauf la première :

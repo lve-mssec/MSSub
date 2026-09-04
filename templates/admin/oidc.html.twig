@@ -1,0 +1,34 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Fournisseur d'identité — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb"><a href="{{ path('app_admin') }}">Administration</a> <span>›</span> Fournisseur d'identité</p>
+
+    <div class="page-head">
+        <h1>Fournisseur d'identité (OIDC)</h1>
+        <p>État actuel : <strong>{{ active ? 'actif' : 'inactif' }}</strong>.</p>
+    </div>
+
+    <div class="form-column">
+        <div class="note" style="margin-bottom:16px">
+            <p style="margin:0 0 8px">URL de retour à déclarer côté fournisseur, à l'identique :</p>
+            <code class="inline">{{ redirect_uri }}</code>
+        </div>
+
+        {{ form_start(form, {attr: {class: 'card'}}) }}
+        {{ form_errors(form) }}
+        {{ form_rest(form) }}
+        <div class="form-actions">
+            <button class="btn" type="submit">Enregistrer</button>
+            <a class="btn btn--quiet" href="{{ path('app_admin') }}">Retour</a>
+        </div>
+        {{ form_end(form) }}
+
+        <p class="login__hint" style="margin-top:14px">
+            Le bouton de connexion n'apparaît que si l'option est active <em>et</em> que
+            l'identifiant client et les deux premières URL sont renseignés : un bouton
+            menant à une erreur vaut moins que pas de bouton.
+        </p>
+    </div>
+{% endblock %}

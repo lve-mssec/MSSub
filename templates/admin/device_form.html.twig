@@ -1,0 +1,67 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ device ? device.name : 'Nouvel équipement' }} — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb">
+        <a href="{{ path('app_admin') }}">Administration</a> <span>›</span>
+        <a href="{{ path('app_admin_device') }}">Équipements</a> <span>›</span>
+        {{ device ? device.name : 'Nouvel équipement' }}
+    </p>
+
+    <div class="page-head"><h1>{{ device ? 'Modifier ' ~ device.name : 'Nouvel équipement' }}</h1></div>
+
+    <div class="form-column">
+        {{ form_start(form, {attr: {class: 'card'}}) }}
+        {{ form_errors(form) }}
+        {{ form_rest(form) }}
+        <div class="form-actions">
+            <button class="btn" type="submit">Enregistrer</button>
+            <a class="btn btn--quiet" href="{{ path('app_admin_device') }}">Annuler</a>
+        </div>
+        {{ form_end(form) }}
+    </div>
+
+    {% if device %}
+        <div class="section-head">
+            <h2 class="section">Interfaces</h2>
+            <div class="section-head__actions no-print">
+                <a class="btn btn--quiet btn--small" href="{{ path('app_admin_interface_new', {id: device.id}) }}">Ajouter une interface</a>
+            </div>
+        </div>
+
+        {% if device.interfaces is empty %}
+            <div class="note">Aucune interface. Une adresse ne peut être rattachée qu'à une interface existante.</div>
+        {% else %}
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Nom</th><th>MAC</th><th>Adresses</th><th>Description</th><th class="no-print"></th></tr></thead>
+                    <tbody>
+                    {% for interface in device.interfaces %}
+                        <tr>
+                            <td>{{ interface.name }}</td>
+                            <td class="cidr muted">{{ interface.macAddress ?? '—' }}</td>
+                            <td class="cidr">
+                                {% for address in interface.ipAddresses %}
+                                    <a href="{{ path('app_subnet_show', {id: address.subnet.id}) }}">{{ address.address }}</a>{% if not loop.last %}, {% endif %}
+                                {% else %}
+                                    <span class="muted">—</span>
+                                {% endfor %}
+                            </td>
+                            <td class="reason">{{ interface.description ?? '—' }}</td>
+                            <td class="row-actions no-print">
+                                <a href="{{ path('app_admin_interface_edit', {id: interface.id}) }}">Modifier</a>
+                                <form method="post" action="{{ path('app_admin_interface_delete', {id: interface.id}) }}"
+                                      onsubmit="return confirm('Supprimer {{ interface.name }} ?');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('supprimer-interface-' ~ interface.id) }}">
+                                    <button type="submit">Supprimer</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

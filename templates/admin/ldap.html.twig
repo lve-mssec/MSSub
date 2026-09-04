@@ -1,0 +1,42 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Annuaire — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb"><a href="{{ path('app_admin') }}">Administration</a> <span>›</span> Annuaire</p>
+
+    <div class="page-head page-head--with-action">
+        <div>
+            <h1>Annuaire LDAP / Active Directory</h1>
+            <p>État actuel : <strong>{{ active ? 'actif' : 'inactif' }}</strong>.</p>
+        </div>
+        <a class="btn btn--quiet no-print" href="{{ path('app_admin_ldap', {tester: 1}) }}">Tester la connexion</a>
+    </div>
+
+    {% if test %}
+        <div class="flash flash--{{ test.ok ? 'success' : 'error' }}">{{ test.message }}</div>
+    {% endif %}
+
+    <div class="form-column">
+        <div class="note" style="margin-bottom:16px">
+            Le mot de passe n'est jamais comparé par MSSub : c'est l'annuaire qui tranche,
+            par un bind avec les identifiants saisis. Aucun secret de compte utilisateur
+            n'est stocké ici. Le compte de service, lui, sert uniquement à retrouver le DN
+            d'un utilisateur et à lire ses groupes.
+        </div>
+
+        {{ form_start(form, {attr: {class: 'card'}}) }}
+        {{ form_errors(form) }}
+        {{ form_rest(form) }}
+        <div class="form-actions">
+            <button class="btn" type="submit">Enregistrer</button>
+            <a class="btn btn--quiet" href="{{ path('app_admin') }}">Retour</a>
+        </div>
+        {{ form_end(form) }}
+
+        <p class="login__hint" style="margin-top:14px">
+            Un champ laissé vide retombe sur la variable d'environnement correspondante,
+            ce qui permet de revenir à la configuration de déploiement.
+        </p>
+    </div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Correspondance des rôles — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb"><a href="{{ path('app_admin') }}">Administration</a> <span>›</span> Correspondance des rôles</p>
+
+    <div class="page-head">
+        <h1>Correspondance des rôles</h1>
+        <p>Quels groupes d'annuaire ou du SSO donnent quels droits dans MSSub.</p>
+    </div>
+
+    <div class="form-column">
+        <form method="post" class="card">
+            <input type="hidden" name="_token" value="{{ csrf_token('roles') }}">
+
+            <div class="field">
+                <label for="map">Une correspondance par ligne</label>
+                <textarea id="map" name="map" rows="8"
+                          placeholder="mssub-admins = ROLE_ADMIN&#10;mssub-operateurs = ROLE_OPERATOR">{{ map }}</textarea>
+                <p class="field__help">
+                    Nom court du groupe, casse ignorée. Rôles disponibles :
+                    <code class="inline">ROLE_ADMIN</code>,
+                    <code class="inline">ROLE_OPERATOR</code>,
+                    <code class="inline">ROLE_USER</code>.
+                    Les lignes commençant par <code class="inline">#</code> sont ignorées.
+                </p>
+            </div>
+
+            <div class="note">
+                Un compte dont aucun groupe n'est reconnu entre en <strong>lecture seule</strong>.
+                Les rôles sont recalculés à chaque connexion : retirer quelqu'un d'un groupe
+                dans l'annuaire lui retire le droit ici, sans intervention.
+            </div>
+
+            <div class="form-actions">
+                <button class="btn" type="submit">Enregistrer</button>
+                <a class="btn btn--quiet" href="{{ path('app_admin') }}">Retour</a>
+            </div>
+        </form>
+
+        {% if not overridden %}
+            <p class="login__hint" style="margin-top:14px">
+                Aucune correspondance enregistrée : celle de la variable d'environnement
+                <code class="inline">APP_ROLE_MAP</code> s'applique.
+            </p>
+        {% endif %}
+    </div>
+{% endblock %}

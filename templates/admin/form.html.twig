@@ -1,0 +1,20 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ title }} — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb"><a href="{{ path('app_admin') }}">Administration</a> <span>›</span> {{ title }}</p>
+
+    <div class="page-head"><h1>{{ title }}</h1></div>
+
+    <div class="form-column">
+        {{ form_start(form, {attr: {class: 'card'}}) }}
+        {{ form_errors(form) }}
+        {{ form_rest(form) }}
+        <div class="form-actions">
+            <button class="btn" type="submit">Enregistrer</button>
+            <a class="btn btn--quiet" href="{{ back }}">Annuler</a>
+        </div>
+        {{ form_end(form) }}
+    </div>
+{% endblock %}

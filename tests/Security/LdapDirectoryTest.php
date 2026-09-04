@@ -19,6 +19,8 @@ use Psr\Log\NullLogger;
  */
 final class LdapDirectoryTest extends TestCase
 {
+    use EmptySettingsTrait;
+
     private const URL = 'ldap://annuaire:389';
     private const BASE_DN = 'dc=mssec,dc=local';
 
@@ -89,6 +91,7 @@ final class LdapDirectoryTest extends TestCase
     ): LdapDirectory {
         return new LdapDirectory(
             new NullLogger(),
+            $this->emptySettings(),
             $enabled,
             self::URL,
             self::BASE_DN,

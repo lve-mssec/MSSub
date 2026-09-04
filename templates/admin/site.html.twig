@@ -1,0 +1,46 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Sites — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb"><a href="{{ path('app_admin') }}">Administration</a> <span>›</span> Sites</p>
+
+    <div class="page-head page-head--with-action">
+        <div>
+            <h1>Sites</h1>
+            <p>Lieux physiques rattachés à une organisation.</p>
+        </div>
+        <a class="btn no-print" href="{{ path('app_admin_site_new') }}">Nouveau site</a>
+    </div>
+
+    {% if rows is empty %}
+        <div class="note">Aucun site déclaré.</div>
+    {% else %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Code</th><th>Nom</th><th>Organisation</th><th>Ville</th><th>VLAN</th><th>Équipements</th><th>Réseaux</th><th class="no-print"></th></tr></thead>
+                <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td><code class="inline">{{ row.site.code }}</code></td>
+                        <td>{{ row.site.name }}</td>
+                        <td class="muted">{{ row.site.organization.name }}</td>
+                        <td class="muted">{{ row.site.city ?? '—' }}</td>
+                        <td class="muted">{{ row.vlans }}</td>
+                        <td class="muted">{{ row.devices }}</td>
+                        <td class="muted">{{ row.subnets }}</td>
+                        <td class="row-actions no-print">
+                            <a href="{{ path('app_admin_site_edit', {id: row.site.id}) }}">Modifier</a>
+                            <form method="post" action="{{ path('app_admin_site_delete', {id: row.site.id}) }}"
+                                  onsubmit="return confirm('Supprimer {{ row.site.name }} ?');">
+                                <input type="hidden" name="_token" value="{{ csrf_token('supprimer-site-' ~ row.site.id) }}">
+                                <button type="submit">Supprimer</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endblock %}

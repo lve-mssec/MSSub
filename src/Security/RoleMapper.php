@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Security;
 
 use App\Entity\User;
+use App\Service\Settings;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -18,18 +19,58 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 final class RoleMapper
 {
+    public const KEY = 'roles.map';
+
     /** @var array<string, string> nom de groupe en minuscules => rôle */
-    private array $map;
+    private readonly array $envMap;
 
     public function __construct(
         private readonly LoggerInterface $logger,
+        private readonly Settings $settings,
         #[Autowire('%env(json:APP_ROLE_MAP)%')]
         array $rawMap = [],
     ) {
-        $this->map = [];
-        foreach ($rawMap as $group => $role) {
-            $this->map[mb_strtolower(trim((string) $group))] = (string) $role;
+        $this->envMap = $this->normalize($rawMap);
+    }
+
+    /**
+     * La correspondance en vigueur, la base l'emportant sur l'environnement.
+     *
+     * @return array<string, string>
+     */
+    private function map(): array
+    {
+        $raw = $this->settings->get(self::KEY);
+        if (null === $raw || '' === trim($raw)) {
+            return $this->envMap;
         }
+
+        try {
+            $decoded = json_decode($raw, true, 8, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            // Une correspondance illisible ne doit pas bloquer les connexions :
+            // on retombe sur l'environnement, en le disant dans les journaux.
+            $this->logger->error('Correspondance des rôles illisible.', ['exception' => $e]);
+
+            return $this->envMap;
+        }
+
+        return \is_array($decoded) ? $this->normalize($decoded) : $this->envMap;
+    }
+
+    /**
+     * @param array<mixed, mixed> $raw
+     *
+     * @return array<string, string>
+     */
+    private function normalize(array $raw): array
+    {
+        $map = [];
+        foreach ($raw as $group => $role) {
+            $map[mb_strtolower(trim((string) $group))] = (string) $role;
+        }
+
+        return $map;
     }
 
     /**
@@ -39,12 +80,13 @@ final class RoleMapper
      */
     public function rolesFor(array $groups): array
     {
+        $map = $this->map();
         $roles = [];
 
         foreach ($groups as $group) {
             $key = mb_strtolower(trim($group));
-            if (isset($this->map[$key])) {
-                $roles[] = $this->map[$key];
+            if (isset($map[$key])) {
+                $roles[] = $map[$key];
             }
         }
 

@@ -1,0 +1,38 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ user_edited ? user_edited.username : 'Nouveau compte' }} — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb">
+        <a href="{{ path('app_admin') }}">Administration</a> <span>›</span>
+        <a href="{{ path('app_admin_user') }}">Comptes</a> <span>›</span>
+        {{ user_edited ? user_edited.username : 'Nouveau compte' }}
+    </p>
+
+    <div class="page-head">
+        <h1>{{ user_edited ? 'Modifier ' ~ user_edited.username : 'Nouveau compte local' }}</h1>
+        {% if user_edited %}
+            <p>Source : {{ user_edited.authSource.label }}.</p>
+        {% endif %}
+    </div>
+
+    <div class="form-column">
+        {% if user_edited and not user_edited.authSource.hasLocalPassword %}
+            <div class="note" style="margin-bottom:16px">
+                Identifiant, nom et courriel sont réécrits à chaque connexion depuis
+                la source d'authentification. Les rôles le sont aussi si le compte
+                appartient à un groupe reconnu — la correspondance des rôles prime
+                alors sur une modification faite ici.
+            </div>
+        {% endif %}
+
+        {{ form_start(form, {attr: {class: 'card'}}) }}
+        {{ form_errors(form) }}
+        {{ form_rest(form) }}
+        <div class="form-actions">
+            <button class="btn" type="submit">Enregistrer</button>
+            <a class="btn btn--quiet" href="{{ path('app_admin_user') }}">Annuler</a>
+        </div>
+        {{ form_end(form) }}
+    </div>
+{% endblock %}

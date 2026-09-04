@@ -1,0 +1,55 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Comptes — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb"><a href="{{ path('app_admin') }}">Administration</a> <span>›</span> Comptes</p>
+
+    <div class="page-head page-head--with-action">
+        <div>
+            <h1>Comptes</h1>
+            <p>{{ admins }} compte(s) administrateur actif(s).</p>
+        </div>
+        <a class="btn no-print" href="{{ path('app_admin_user_new') }}">Nouveau compte local</a>
+    </div>
+
+    {% if admins == 1 %}
+        <div class="note">
+            Un seul administrateur actif : ni sa suppression, ni son passage en lecture seule,
+            ni sa désactivation ne seront acceptés tant qu'un second n'existe pas.
+        </div>
+    {% endif %}
+
+    <div class="table-wrap" style="margin-top:14px">
+        <table>
+            <thead>
+            <tr><th>Identifiant</th><th>Nom affiché</th><th>Source</th><th>Rôles</th><th>État</th><th>Dernière connexion</th><th class="no-print"></th></tr>
+            </thead>
+            <tbody>
+            {% for user in users %}
+                <tr>
+                    <td>{{ user.username }}</td>
+                    <td class="muted">{{ user.displayName ?? '—' }}</td>
+                    <td>{{ user.authSource.label }}</td>
+                    <td class="muted">
+                        {%- set labels = {'ROLE_ADMIN': 'Administrateur', 'ROLE_OPERATOR': 'Opérateur', 'ROLE_USER': 'Lecture'} -%}
+                        {% for role in user.roles %}{{ labels[role] ?? role }}{% if not loop.last %}, {% endif %}{% endfor %}
+                    </td>
+                    <td><span class="pill pill--{{ user.active ? 'used' : 'na' }}">{{ user.active ? 'actif' : 'désactivé' }}</span></td>
+                    <td class="muted">{{ user.lastLoginAt ? user.lastLoginAt|date('d/m/Y H:i') : 'jamais' }}</td>
+                    <td class="row-actions no-print">
+                        <a href="{{ path('app_admin_user_edit', {id: user.id}) }}">Modifier</a>
+                        {% if user.userIdentifier != app.user.userIdentifier %}
+                            <form method="post" action="{{ path('app_admin_user_delete', {id: user.id}) }}"
+                                  onsubmit="return confirm('Supprimer le compte {{ user.username }} ?');">
+                                <input type="hidden" name="_token" value="{{ csrf_token('supprimer-compte-' ~ user.id) }}">
+                                <button type="submit">Supprimer</button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

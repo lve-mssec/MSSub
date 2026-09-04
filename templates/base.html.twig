@@ -38,6 +38,14 @@
                href="{{ path('app_audit') }}">Journal</a>
         </div>
 
+        {% if is_granted('ROLE_ADMIN') %}
+            <div class="sidebar__section">Configuration</div>
+            <div class="sidebar__nav">
+                <a class="sidebar__link {{ nav is defined and nav == 'admin' ? 'is-active' }}"
+                   href="{{ path('app_admin') }}">Administration</a>
+            </div>
+        {% endif %}
+
         <div class="sidebar__spacer"></div>
 
         <div class="sidebar__foot">

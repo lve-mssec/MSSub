@@ -1,0 +1,47 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Équipements — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb"><a href="{{ path('app_admin') }}">Administration</a> <span>›</span> Équipements</p>
+
+    <div class="page-head page-head--with-action">
+        <div>
+            <h1>Équipements</h1>
+            <p>Ce qui porte les interfaces, donc les adresses.</p>
+        </div>
+        <a class="btn no-print" href="{{ path('app_admin_device_new') }}">Nouvel équipement</a>
+    </div>
+
+    {% if devices is empty %}
+        <div class="note">Aucun équipement déclaré.</div>
+    {% else %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr><th>Nom</th><th>Type</th><th>Site</th><th>Constructeur</th><th>Modèle</th><th>Interfaces</th><th class="no-print"></th></tr>
+                </thead>
+                <tbody>
+                {% for device in devices %}
+                    <tr>
+                        <td>{{ device.name }}</td>
+                        <td>{{ device.type.label }}</td>
+                        <td class="muted">{{ device.site ? device.site.name : '—' }}</td>
+                        <td class="muted">{{ device.vendor ?? '—' }}</td>
+                        <td class="muted">{{ device.model ?? '—' }}</td>
+                        <td class="muted">{{ device.interfaces|length }}</td>
+                        <td class="row-actions no-print">
+                            <a href="{{ path('app_admin_device_edit', {id: device.id}) }}">Modifier</a>
+                            <form method="post" action="{{ path('app_admin_device_delete', {id: device.id}) }}"
+                                  onsubmit="return confirm('Supprimer {{ device.name }} ? Ses interfaces seront supprimées, les adresses conservées.');">
+                                <input type="hidden" name="_token" value="{{ csrf_token('supprimer-equipement-' ~ device.id) }}">
+                                <button type="submit">Supprimer</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endblock %}
