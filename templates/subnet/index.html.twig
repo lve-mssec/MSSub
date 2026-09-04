@@ -3,9 +3,14 @@
 {% block title %}Plans d'adressage — MSSub{% endblock %}
 
 {% block body %}
-    <div class="page-head">
-        <h1>Plans d'adressage</h1>
-        <p>Hiérarchie des blocs et des sous-réseaux, par organisation.</p>
+    <div class="page-head page-head--with-action">
+        <div>
+            <h1>Plans d'adressage</h1>
+            <p>Hiérarchie des blocs et des sous-réseaux, par organisation.</p>
+        </div>
+        {% if is_granted('ROLE_OPERATOR') %}
+            <a class="btn no-print" href="{{ path('app_subnet_new') }}">Nouveau réseau</a>
+        {% endif %}
     </div>
 
     {% for entry in trees %}

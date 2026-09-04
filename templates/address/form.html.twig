@@ -1,0 +1,30 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ address ? 'Modifier une adresse' : 'Nouvelle adresse' }} — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb">
+        <a href="{{ path('app_subnet_index') }}">Plans d'adressage</a>
+        <span>›</span>
+        <a href="{{ path('app_subnet_show', {id: subnet.id}) }}">{{ subnet.cidr }}</a>
+        <span>›</span>
+        {{ address ? 'Modification' : 'Nouvelle adresse' }}
+    </p>
+
+    <div class="page-head">
+        <h1>{{ address ? 'Modifier ' ~ address.address : 'Nouvelle adresse' }}</h1>
+        <p>Dans {{ subnet.cidr }}{% if subnet.name %} — {{ subnet.name }}{% endif %}</p>
+    </div>
+
+    <div class="form-column">
+        {{ form_start(form, {attr: {class: 'card'}}) }}
+        {{ form_errors(form) }}
+        {{ form_rest(form) }}
+
+        <div class="form-actions">
+            <button class="btn" type="submit">{{ address ? 'Enregistrer' : 'Ajouter' }}</button>
+            <a class="btn btn--quiet" href="{{ path('app_subnet_show', {id: subnet.id}) }}">Annuler</a>
+        </div>
+        {{ form_end(form) }}
+    </div>
+{% endblock %}

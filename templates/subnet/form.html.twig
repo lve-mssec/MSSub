@@ -1,0 +1,46 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ subnet ? subnet.cidr ~ ' — modification' : 'Nouveau réseau' }} — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb">
+        <a href="{{ path('app_subnet_index') }}">Plans d'adressage</a>
+        <span>›</span>
+        {% if subnet %}
+            <a href="{{ path('app_subnet_show', {id: subnet.id}) }}">{{ subnet.cidr }}</a>
+            <span>›</span> Modification
+        {% else %}
+            Nouveau réseau
+        {% endif %}
+    </p>
+
+    <div class="page-head">
+        <h1>{{ subnet ? 'Modifier ' ~ subnet.cidr : 'Nouveau réseau' }}</h1>
+        <p>{{ organization.name }}</p>
+    </div>
+
+    <div class="form-column">
+        {{ form_start(form, {attr: {class: 'card'}}) }}
+        {{ form_errors(form) }}
+
+        {% if not subnet %}
+            <p class="note" style="margin-bottom:16px">
+                Le bloc parent est déterminé automatiquement à partir du réseau saisi.
+                Un doublon ou un chevauchement est refusé.
+            </p>
+        {% else %}
+            <p class="note" style="margin-bottom:16px">
+                Le réseau <code class="inline">{{ subnet.cidr }}</code> ne se modifie pas :
+                le déplacer reviendrait à renuméroter tout ce qu'il contient.
+            </p>
+        {% endif %}
+
+        {{ form_rest(form) }}
+
+        <div class="form-actions">
+            <button class="btn" type="submit">{{ subnet ? 'Enregistrer' : 'Créer le réseau' }}</button>
+            <a class="btn btn--quiet" href="{{ subnet ? path('app_subnet_show', {id: subnet.id}) : path('app_subnet_index') }}">Annuler</a>
+        </div>
+        {{ form_end(form) }}
+    </div>
+{% endblock %}

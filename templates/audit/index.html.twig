@@ -1,0 +1,90 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Journal — MSSub{% endblock %}
+
+{% block body %}
+    <div class="page-head">
+        <h1>Journal d'audit</h1>
+        <p>{{ total }} événement{{ total > 1 ? 's' }} enregistré{{ total > 1 ? 's' }}.</p>
+    </div>
+
+    <form method="get" class="card no-print">
+        <div class="search-row">
+            <div>
+                <label for="action">Action</label>
+                <select id="action" name="action">
+                    <option value="">Toutes</option>
+                    {% for case in actions %}
+                        <option value="{{ case.value }}" {{ case.value == action ? 'selected' }}>{{ case.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="acteur">Acteur</label>
+                <input type="search" id="acteur" name="acteur" value="{{ actor }}" placeholder="identifiant">
+            </div>
+            <button class="btn" type="submit">Filtrer</button>
+        </div>
+    </form>
+
+    {% if entries is empty %}
+        <div class="note" style="margin-top:16px">Aucun événement ne correspond.</div>
+    {% else %}
+        <div class="table-wrap" style="margin-top:16px">
+            <table>
+                <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Acteur</th>
+                    <th>Action</th>
+                    <th>Objet</th>
+                    <th>Détail</th>
+                    <th>Origine</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for entry in entries %}
+                    <tr>
+                        <td class="muted">{{ entry.occurredAt|date('d/m/Y H:i:s') }}</td>
+                        <td>{{ entry.actorUsername }}</td>
+                        <td>{{ entry.action.label }}</td>
+                        <td>
+                            {{ entry.label ?? '—' }}
+                            {% if entry.entityClass %}
+                                <span class="muted">({{ entry.entityClass }})</span>
+                            {% endif %}
+                        </td>
+                        <td class="reason">
+                            {% if entry.changes %}
+                                {% for field, values in entry.changes %}
+                                    <div>
+                                        <code class="inline">{{ field }}</code>
+                                        <span class="muted">{{ values[0]|default('∅') }}</span>
+                                        →
+                                        {{ values[1]|default('∅') }}
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="cidr muted">{{ entry.clientIp ?? '—' }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if pages > 1 %}
+            <div class="pager no-print">
+                {% if page > 1 %}
+                    <a class="btn btn--quiet btn--small" href="{{ path('app_audit', {page: page - 1, action: action, acteur: actor}) }}">Précédent</a>
+                {% endif %}
+                <span class="muted">Page {{ page }} sur {{ pages }}</span>
+                {% if page < pages %}
+                    <a class="btn btn--quiet btn--small" href="{{ path('app_audit', {page: page + 1, action: action, acteur: actor}) }}">Suivant</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

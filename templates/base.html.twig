@@ -24,6 +24,12 @@
                href="{{ path('app_search') }}">Rechercher une IP</a>
         </div>
 
+        <div class="sidebar__section">Traçabilité</div>
+        <div class="sidebar__nav">
+            <a class="sidebar__link {{ nav is defined and nav == 'audit' ? 'is-active' }}"
+               href="{{ path('app_audit') }}">Journal</a>
+        </div>
+
         <div class="sidebar__spacer"></div>
 
         <div class="sidebar__foot">
@@ -35,6 +41,12 @@
     </nav>
 
     <main class="content">
+        {% for type, messages in app.flashes %}
+            {% for message in messages %}
+                <div class="flash flash--{{ type }} no-print">{{ message }}</div>
+            {% endfor %}
+        {% endfor %}
+
         {% block body %}{% endblock %}
     </main>
 </div>

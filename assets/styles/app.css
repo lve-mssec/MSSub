@@ -418,3 +418,106 @@ input:focus, select:focus { outline: 2px solid var(--orange-bright); outline-off
 
 .usage { display: flex; align-items: center; gap: 8px; }
 .usage__text { font-family: var(--mono); font-size: 12px; color: var(--text-3); white-space: nowrap; }
+
+/* ---------- Formulaires structurés ---------- */
+
+.form-column { max-width: 620px; }
+
+.field { margin-bottom: 14px; }
+
+.field--check { display: flex; align-items: center; }
+.field__check { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--text); font-size: 14px; }
+.field__check input { width: auto; }
+
+.field--invalid input, .field--invalid select, .field--invalid textarea { border-color: var(--red); }
+
+.field__errors {
+    list-style: none;
+    margin: 5px 0 0;
+    padding: 0;
+    font-size: 12px;
+    color: #96190F;
+}
+
+.field__help { margin: 4px 0 0; font-size: 12px; color: var(--text-3); }
+
+textarea {
+    width: 100%;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    resize: vertical;
+}
+
+textarea:focus { outline: 2px solid var(--orange-bright); outline-offset: -1px; border-color: var(--orange); }
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+
+/* ---------- En-têtes porteurs d'actions ---------- */
+
+.page-head--with-action {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.page-head__actions { display: flex; gap: 8px; align-items: center; }
+.page-head__actions form { margin: 0; }
+
+/*
+ * La suppression reste un bouton discret : le rouge de la charte sert au liseré
+ * et au dégradé, pas à un aplat, où il se confond avec la gravité critique.
+ */
+.btn--danger { color: #96190F; }
+.btn--danger:hover { background: var(--wash); border-color: #E7D3C0; color: #96190F; }
+
+.row-actions { white-space: nowrap; }
+.row-actions form { display: inline; margin: 0; }
+
+.row-actions a, .row-actions button {
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--text-2);
+    background: none;
+    border: 0;
+    padding: 0 6px 0 0;
+    cursor: pointer;
+    text-decoration: none;
+    border-bottom: 1px solid var(--line);
+}
+
+.row-actions a:hover, .row-actions button:hover { color: var(--orange); border-bottom-color: var(--orange); }
+
+/* ---------- Messages ---------- */
+
+.flash {
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--text);
+}
+
+/* Le liseré porte l'information ; le fond reste sur la surface claire. */
+.flash--success { border-left: 3px solid var(--orange); background: var(--wash); }
+.flash--error { border-left: 3px solid var(--red); background: var(--wash); color: #96190F; }
+
+.pager {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+}

@@ -63,13 +63,19 @@ class Subnet
     #[ORM\Column(type: Types::SMALLINT, enumType: IpVersion::class)]
     private IpVersion $version = IpVersion::V4;
 
-    /** Premiere adresse du reseau, forme binaire ; le PHP la voit en pointe. */
+    /**
+     * Premiere adresse du reseau, forme binaire ; le PHP la voit en pointe.
+     *
+     * Volontairement sans contrainte de validation : cette valeur n'est jamais
+     * saisie, elle est derivee d'une notation CIDR par IpTools::parseCidr(),
+     * qui refuse deja tout ce qui n'est pas une adresse. Une contrainte ici ne
+     * protegerait de rien et ferait remonter une erreur sur un champ absent du
+     * formulaire. La colonne est NOT NULL : une omission echouerait a l'ecriture.
+     */
     #[ORM\Column(name: 'network_address', type: 'ip_address')]
-    #[Assert\NotBlank]
-    #[Assert\Ip(version: Assert\Ip::ALL)]
     private ?string $networkAddress = null;
 
-    /** Derniere adresse du reseau (diffusion en v4). Denormalisee pour l'indexation. */
+    /** Derniere adresse du reseau (diffusion en v4), derivee elle aussi. */
     #[ORM\Column(name: 'last_address', type: 'ip_address')]
     private ?string $lastAddress = null;
 

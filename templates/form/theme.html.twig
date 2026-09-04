@@ -1,0 +1,37 @@
+{#
+   Thème de formulaire minimal, aligné sur la charte.
+
+   Le rendu par défaut de Symfony produit un balisage neutre qui n'a aucune
+   raison de porter nos classes. Plutôt que de répéter des attributs dans chaque
+   gabarit, la correspondance est faite ici, une fois.
+#}
+{% use 'form_div_layout.html.twig' %}
+
+{% block form_row %}
+    <div class="field{{ errors|length ? ' field--invalid' }}">
+        {{ form_label(form) }}
+        {{ form_widget(form) }}
+        {{ form_errors(form) }}
+        {% if help is defined and help %}<p class="field__help">{{ help }}</p>{% endif %}
+    </div>
+{% endblock %}
+
+{% block checkbox_row %}
+    <div class="field field--check">
+        <label class="field__check">
+            {{ form_widget(form) }}
+            <span>{{ label|default(name)|trans }}</span>
+        </label>
+        {{ form_errors(form) }}
+    </div>
+{% endblock %}
+
+{% block form_errors %}
+    {% if errors|length > 0 %}
+        <ul class="field__errors">
+            {% for error in errors %}
+                <li>{{ error.message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endblock %}

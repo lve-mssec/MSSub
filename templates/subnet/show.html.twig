@@ -13,9 +13,26 @@
         {% endfor %}
     </p>
 
-    <div class="page-head">
-        <h1>{{ subnet.cidr }}</h1>
-        <p>{{ subnet.name ?? 'Sans nom' }}{% if subnet.description %} — {{ subnet.description }}{% endif %}</p>
+    <div class="page-head page-head--with-action">
+        <div>
+            <h1>{{ subnet.cidr }}</h1>
+            <p>{{ subnet.name ?? 'Sans nom' }}{% if subnet.description %} — {{ subnet.description }}{% endif %}</p>
+        </div>
+        {% if is_granted('ROLE_OPERATOR') %}
+            <div class="page-head__actions no-print">
+                <a class="btn btn--quiet" href="{{ path('app_subnet_edit', {id: subnet.id}) }}">Modifier</a>
+                {% if not subnet.container %}
+                    <a class="btn" href="{{ path('app_address_new', {id: subnet.id}) }}">Ajouter une adresse</a>
+                {% endif %}
+                {% if is_granted('ROLE_ADMIN') %}
+                    <form method="post" action="{{ path('app_subnet_delete', {id: subnet.id}) }}"
+                          onsubmit="return confirm('Supprimer {{ subnet.cidr }} ? Les sous-réseaux seront rattachés au bloc parent.');">
+                        <input type="hidden" name="_token" value="{{ csrf_token('supprimer-reseau-' ~ subnet.id) }}">
+                        <button class="btn btn--quiet btn--danger" type="submit">Supprimer</button>
+                    </form>
+                {% endif %}
+            </div>
+        {% endif %}
     </div>
 
     <div class="grid grid--two">
@@ -58,6 +75,14 @@
                     <div class="note">Ce réseau est plein.</div>
                 {% else %}
                     <p class="cidr">{{ freeAddresses|join(', ') }}</p>
+                    {% if is_granted('ROLE_OPERATOR') %}
+                        <form method="post" action="{{ path('app_address_reserve', {id: subnet.id}) }}" class="no-print">
+                            <input type="hidden" name="_token" value="{{ csrf_token('reserver-' ~ subnet.id) }}">
+                            <button class="btn btn--quiet btn--small" type="submit">
+                                Réserver {{ freeAddresses|first }}
+                            </button>
+                        </form>
+                    {% endif %}
                 {% endif %}
             {% else %}
                 <div class="note">
@@ -111,7 +136,7 @@
             <div class="table-wrap">
                 <table>
                     <thead>
-                    <tr><th>Adresse</th><th>État</th><th>Nom d'hôte</th><th>MAC</th><th>Interface</th><th>Description</th></tr>
+                    <tr><th>Adresse</th><th>État</th><th>Nom d'hôte</th><th>MAC</th><th>Interface</th><th>Description</th>{% if is_granted('ROLE_OPERATOR') %}<th class="no-print"></th>{% endif %}</tr>
                     </thead>
                     <tbody>
                     {% for address in addresses %}
@@ -127,6 +152,16 @@
                             <td class="cidr muted">{{ address.macAddress ?? '—' }}</td>
                             <td>{{ address.interface ? address.interface : '—' }}</td>
                             <td class="reason">{{ address.description ?? '—' }}</td>
+                            {% if is_granted('ROLE_OPERATOR') %}
+                                <td class="row-actions no-print">
+                                    <a href="{{ path('app_address_edit', {id: address.id}) }}">Modifier</a>
+                                    <form method="post" action="{{ path('app_address_delete', {id: address.id}) }}"
+                                          onsubmit="return confirm('Supprimer {{ address.address }} ?');">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('supprimer-adresse-' ~ address.id) }}">
+                                        <button type="submit">Supprimer</button>
+                                    </form>
+                                </td>
+                            {% endif %}
                         </tr>
                     {% endfor %}
                     </tbody>
