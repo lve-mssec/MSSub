@@ -94,6 +94,24 @@ Puis remplacer `MOT_DE_PASSE` **avec un éditeur** plutôt qu'en ligne de
 commande : un mot de passe contient volontiers des caractères que le shell
 interpréterait.
 
+> **`DATABASE_URL` est une URL, pas une chaîne de connexion libre.** Les
+> caractères réservés du mot de passe doivent y être encodés, sans quoi la
+> lecture s'arrête au premier d'entre eux et vous obtiendrez un
+> `Access denied` incompréhensible :
+>
+> | Caractère | À écrire |
+> | --- | --- |
+> | `@` | `%40` |
+> | `:` | `%3A` |
+> | `/` | `%2F` |
+> | `#` | `%23` |
+> | `?` | `%3F` |
+> | `%` | `%25` |
+> | `&` | `%26` |
+>
+> Un mot de passe sans ces caractères évite la question. Pour encoder le vôtre :
+> `php -r 'echo rawurlencode($argv[1]), PHP_EOL;' 'votre-mot-de-passe'`
+
 Contrôler tout de suite que le secret est bien là — un secret prévisible rend
 les jetons anti-CSRF forgeables :
 
@@ -159,12 +177,16 @@ php bin/console cache:warmup --env=prod
 `public/assets/` avec une empreinte dans leur nom. **À rejouer à chaque mise à
 jour**, faute de quoi l'interface s'affichera sans style.
 
+Ces commandes s'exécutent **avant** l'étape suivante, qui retire à votre compte
+le droit d'écrire dans l'arborescence. Si vous devez les rejouer après, voir la
+procédure de mise à jour.
+
 ## 6. Droits
 
 ```bash
 sudo chown -R root:www-data /var/www/mssub
 sudo chmod -R g-w /var/www/mssub
-sudo chown -R www-data:www-data /var/www/mssub/var
+sudo chown -R www-data:www-data /var/www/mssub/var /var/www/mssub/public/assets
 sudo chmod 640 /var/www/mssub/.env.local
 sudo chown root:www-data /var/www/mssub/.env.local
 ```
@@ -291,11 +313,22 @@ cd /var/www/mssub
 # Toujours avant une migration : elle n'est pas réversible sans sauvegarde.
 mysqldump --single-transaction -u mssub -p mssub > ~/mssub-avant-maj.sql
 
+# Les droits de l'étape 6 rendent l'arborescence non inscriptible : on la
+# rouvre le temps du déploiement, puis on la referme.
+sudo chown -R "$USER":www-data /var/www/mssub
+
 git pull
 APP_ENV=prod APP_DEBUG=0 composer install --no-dev --optimize-autoloader
 php bin/console doctrine:migrations:migrate --no-interaction --env=prod
 php bin/console asset-map:compile --env=prod
 php bin/console cache:clear --env=prod
+
+# Refermer, comme à l'étape 6.
+sudo chown -R root:www-data /var/www/mssub
+sudo chmod -R g-w /var/www/mssub
+sudo chown -R www-data:www-data /var/www/mssub/var /var/www/mssub/public/assets
+sudo chown root:www-data /var/www/mssub/.env.local
+
 sudo systemctl reload apache2
 ```
 
@@ -317,6 +350,64 @@ La base sans `APP_SECRET` est inexploitable pour les secrets qu'elle contient :
 une restauration avec un autre secret applicatif rendra les mots de passe LDAP
 et OIDC illisibles, et il faudra les ressaisir. Le reste du référentiel, lui,
 sera intact.
+
+## Dépannage
+
+### `Access denied for user 'mssub'@'localhost'`
+
+Trois causes, par ordre de fréquence.
+
+**Le mot de passe contient un caractère réservé non encodé** dans
+`DATABASE_URL`. C'est de loin la plus courante — voir l'encadré de l'étape 4.
+Testez le mot de passe hors de l'URL :
+
+```bash
+mariadb -u mssub -p -e "SELECT 'connexion ok';"
+```
+
+S'il passe ici mais pas dans l'application, le problème est l'encodage.
+
+**Le compte n'existe pas, ou pas pour cet hôte.** MariaDB distingue
+`'mssub'@'localhost'` de `'mssub'@'127.0.0.1'` :
+
+```bash
+sudo mariadb -e "SELECT user, host FROM mysql.user WHERE user='mssub';"
+```
+
+L'étape 2 crée `'mssub'@'localhost'`, ce qui couvre une `DATABASE_URL` pointant
+sur `127.0.0.1` **ou** sur `localhost` — MariaDB résout les deux vers le même
+compte tant que la connexion reste locale.
+
+**Le mot de passe ne correspond pas.** Le réinitialiser :
+
+```bash
+sudo mariadb -e "ALTER USER 'mssub'@'localhost' IDENTIFIED BY 'nouveau'; FLUSH PRIVILEGES;"
+```
+
+Puis reporter la valeur — encodée — dans `.env.local`.
+
+### `Failed to create "public/assets": mkdir(): Permission denied`
+
+L'étape 6 a déjà été jouée : l'arborescence appartient à `root` et votre compte
+ne peut plus y écrire. Rouvrez, compilez, refermez — c'est la séquence de la
+procédure de mise à jour :
+
+```bash
+sudo chown -R "$USER":www-data /var/www/mssub
+php bin/console asset-map:compile --env=prod
+sudo chown -R root:www-data /var/www/mssub
+sudo chmod -R g-w /var/www/mssub
+sudo chown -R www-data:www-data /var/www/mssub/var /var/www/mssub/public/assets
+sudo chown root:www-data /var/www/mssub/.env.local
+```
+
+### La console noie sa sortie sous des dépréciations JSON
+
+Corrigé en v1.0.3 : les dépréciations vont désormais dans
+`var/log/deprecation.log` au lieu de la sortie d'erreur, et la configuration
+Doctrine n'en produit plus. Si vous déployez une version antérieure, elles sont
+sans conséquence — mais elles masquent les vraies erreurs, ce qui est la raison
+du correctif.
 
 ## Ce qui n'est pas couvert ici
 

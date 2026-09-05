@@ -5,6 +5,11 @@ services:
     build:
       context: .
       dockerfile: docker/php/Dockerfile
+      args:
+        # Alignée sur la cible de production : Debian 13 fournit PHP 8.4.
+        # Développer sur une version antérieure ferait découvrir les
+        # dépréciations chez le client plutôt qu'ici.
+        PHP_VERSION: "8.4"
     volumes:
       # Le code vit sur le Mac, le runtime dans le conteneur.
       - .:/var/www/html

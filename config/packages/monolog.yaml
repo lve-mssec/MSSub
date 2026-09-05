@@ -48,8 +48,13 @@ when@prod:
                 type: console
                 process_psr_3_messages: false
                 channels: ["!event", "!doctrine"]
+            # Les dépréciations vont dans un fichier, pas sur la sortie d'erreur.
+            # Envoyées sur stderr, elles noient la sortie de chaque commande de
+            # déploiement sous des centaines de lignes JSON, au point de masquer
+            # les vraies erreurs — ce qui est exactement ce qu'un déploiement ne
+            # doit pas faire. Elles restent consultables dans var/log.
             deprecation:
                 type: stream
                 channels: [deprecation]
-                path: php://stderr
+                path: '%kernel.logs_dir%/deprecation.log'
                 formatter: monolog.formatter.json

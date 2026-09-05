@@ -51,7 +51,9 @@ docker run --rm --network mssub_default -v "$PWD":/var/www/html -w /var/www/html
     mssub-app:php84 sh -c 'rm -rf var/cache/test; php bin/phpunit'
 ```
 
-PHP 8.3 et 8.4 passent la suite sans dépréciation.
+L'environnement de développement tourne sur **PHP 8.4**, la version de Debian 13 :
+développer sur une version antérieure ferait découvrir les dépréciations chez le
+client plutôt qu'ici.
 
 ## Décisions structurantes
 
@@ -177,6 +179,8 @@ Ils ont tous coûté du temps ; ils sont documentés ici pour ne pas être repay
 | **`KernelBrowser` redémarre** | Entre deux requêtes il ouvre une autre connexion : les données d'une transaction de test deviennent invisibles. `disableReboot()`. |
 | **Entité relue en mémoire** | Après un formulaire refusé, l'entité porte déjà les valeurs soumises. Un test qui la relit via le dépôt constate le changement qu'il cherchait à empêcher : interroger la ligne en base. |
 | **`cache:clear --env=test`** | Ne suffit pas toujours à purger le conteneur compilé ; `rm -rf var/cache/test` si le comportement ne suit pas la configuration. |
+| **Dépréciations en prod** | Le recipe Monolog envoie le canal `deprecation` sur `php://stderr` : chaque commande de déploiement se noie sous des centaines de lignes JSON qui masquent les vraies erreurs. Elles vont maintenant dans `var/log/deprecation.log`. |
+| **`DATABASE_URL`** | C'est une URL : un `@` ou un `#` non encodé dans le mot de passe fait échouer la connexion avec un `Access denied` qui n'a rien à voir. |
 | **Recipes Flex** | Le recipe Doctrine injecte un service PostgreSQL dans `compose.yaml` et une `DATABASE_URL` postgres *après* la vôtre dans `.env`. Relisez ces deux fichiers après tout `composer require`. |
 | **Collision Twig** | Une méthode `created()` et un accesseur `getCreated()` : Twig appelle la première et affiche du vide. Les incréments s'appellent `addCreated()`. |
 | **Groupes LDAP** | Les lire après le *bind* utilisateur renvoie une liste vide — il n'a pas le droit de parcourir l'unité des groupes. Revenir au compte de service. |
