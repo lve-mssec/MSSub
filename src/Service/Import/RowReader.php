@@ -66,7 +66,7 @@ final class RowReader
     /** @return list<array<string, string>> */
     public function readCsv(string $path): array
     {
-        $reader = Reader::createFromPath($path);
+        $reader = Reader::from($path);
         $reader->setDelimiter($this->guessDelimiter($path));
         $reader->setHeaderOffset(0);
 

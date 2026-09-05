@@ -2,6 +2,15 @@
 
 MSSub (MSSec Subnets) est un portail web pour gérer les plans d'adressage réseaux de MSSEC.
 
+## Documentation
+
+| Document | Pour qui |
+| --- | --- |
+| [Guide de l'utilisateur](docs/utilisateur.md) | Consulter, attribuer, importer, exporter. |
+| [Guide de l'administrateur](docs/administration.md) | Comptes, annuaire, SSO, référentiel, journal. |
+| [Installation sur Debian 13](docs/installation-debian-13.md) | Mise en production. |
+| [Guide du développeur](docs/developpeur.md) | Architecture, conventions, pièges connus. |
+
 ## Démarrage
 
 Un runtime Docker suffit — ni PHP ni Composer ne sont requis sur le poste.

@@ -9,6 +9,7 @@ use App\Entity\Site;
 use App\Entity\Subnet;
 use App\Repository\IpAddressRepository;
 use App\Repository\SubnetRepository;
+use League\Csv\Bom;
 use League\Csv\Writer;
 
 /**
@@ -106,9 +107,9 @@ final class CsvExporter
     /** @param list<string> $header */
     private function writer(array $header): Writer
     {
-        $csv = Writer::createFromString();
+        $csv = Writer::fromString();
         $csv->setDelimiter(';');
-        $csv->setOutputBOM(Writer::BOM_UTF8);
+        $csv->setOutputBOM(Bom::Utf8);
         $csv->insertOne($header);
 
         return $csv;
