@@ -75,19 +75,38 @@ d'abord. L'étape suivante explique pourquoi.
 
 ## 4. Configuration
 
-Créer `/var/www/mssub/.env.local` — ce fichier n'est pas versionné :
+Créer `/var/www/mssub/.env.local` — ce fichier n'est pas versionné.
+
+Le secret applicatif est engendré dans le même geste : il n'y a rien à
+remplacer, donc rien à oublier.
 
 ```bash
-cat > /var/www/mssub/.env.local <<'ENV'
-APP_ENV=prod
-APP_DEBUG=0
-APP_SECRET=À_REMPLACER
-DATABASE_URL="mysql://mssub:un-mot-de-passe-solide@127.0.0.1:3306/mssub?serverVersion=11.8.0-MariaDB&charset=utf8mb4"
-ENV
+umask 027
+{
+    echo "APP_ENV=prod"
+    echo "APP_DEBUG=0"
+    echo "APP_SECRET=$(openssl rand -hex 32)"
+    echo 'DATABASE_URL="mysql://mssub:MOT_DE_PASSE@127.0.0.1:3306/mssub?serverVersion=11.8.0-MariaDB&charset=utf8mb4"'
+} > /var/www/mssub/.env.local
+```
 
-# Un secret applicatif aléatoire, jamais celui d'un autre environnement.
-sed -i "s/À_REMPLACER/$(openssl rand -hex 32)/" /var/www/mssub/.env.local
-chmod 640 /var/www/mssub/.env.local
+Puis remplacer `MOT_DE_PASSE` **avec un éditeur** plutôt qu'en ligne de
+commande : un mot de passe contient volontiers des caractères que le shell
+interpréterait.
+
+Contrôler tout de suite que le secret est bien là — un secret prévisible rend
+les jetons anti-CSRF forgeables :
+
+```bash
+grep -qE '^APP_SECRET=[0-9a-f]{64}$' /var/www/mssub/.env.local \
+    && echo "secret applicatif : correct" \
+    || echo "secret applicatif : À CORRIGER"
+```
+
+S'il est à corriger :
+
+```bash
+sed -i "s|^APP_SECRET=.*|APP_SECRET=$(openssl rand -hex 32)|" /var/www/mssub/.env.local
 ```
 
 > **`APP_SECRET` ne se change pas à la légère.** Il sert à dériver la clé qui
@@ -250,9 +269,14 @@ branché l'annuaire, il est le seul à fonctionner quand celui-ci est injoignabl
 ## 10. Vérification
 
 ```bash
+# Le secret applicatif est bien aléatoire, et non le gabarit du guide.
+grep -qE '^APP_SECRET=[0-9a-f]{64}$' /var/www/mssub/.env.local \
+    && echo "secret applicatif : correct" \
+    || echo "secret applicatif : À CORRIGER"
+
 curl -sI https://mssub.exemple.fr/ | head -1          # 302 vers /connexion
 curl -s  https://mssub.exemple.fr/connexion | grep -c csrf_token   # 1
-sudo -u www-data php bin/console about | head -12
+sudo -u www-data php bin/console about --env=prod | head -12
 ```
 
 Puis, dans un navigateur : connexion, **Administration → Annuaire → Tester la
