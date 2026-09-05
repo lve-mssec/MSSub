@@ -11,6 +11,16 @@ MSSub (MSSec Subnets) est un portail web pour gérer les plans d'adressage rése
 | [Installation sur Debian 13](docs/installation-debian-13.md) | Mise en production. |
 | [Guide du développeur](docs/developpeur.md) | Architecture, conventions, pièges connus. |
 
+## Installation en production
+
+```bash
+sudo ./deploy/installer-debian-13.sh
+```
+
+Script d'installation pour Debian 13 : toutes les questions d'abord, puis
+l'installation complète sans interruption. Voir
+[docs/installation-debian-13.md](docs/installation-debian-13.md).
+
 ## Démarrage
 
 Un runtime Docker suffit — ni PHP ni Composer ne sont requis sur le poste.

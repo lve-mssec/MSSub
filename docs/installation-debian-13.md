@@ -10,6 +10,65 @@ dépréciation, aucun dépôt tiers n'est donc nécessaire.
 > Vérifiez les versions réellement proposées par votre miroir avant de
 > commencer : `apt-cache policy php mariadb-server apache2`.
 
+## Installation assistée
+
+```bash
+git clone <dépôt> /tmp/mssub-source
+sudo /tmp/mssub-source/deploy/installer-debian-13.sh
+```
+
+Le script **pose toutes les questions au début**, affiche un récapitulatif, puis
+déroule l'installation sans plus rien demander : une installation qui
+s'interrompt au bout de dix minutes pour réclamer un mot de passe est une
+installation qu'on ne peut ni lancer le soir, ni automatiser.
+
+Il vous demande le domaine, le répertoire, la source du code, la base, le compte
+administrateur et le certificat TLS. Le mot de passe de la base et le secret
+applicatif sont engendrés par défaut — en hexadécimal, donc sans caractère
+réservé d'URL à encoder.
+
+Il est **rejouable** : le relancer sur une installation existante met à jour le
+code, réaligne le mot de passe de la base et reprend là où il faut.
+
+### Sans interaction
+
+Chaque réponse peut venir d'une variable d'environnement :
+
+```bash
+sudo MSSUB_DOMAINE=mssub.exemple.fr \
+     MSSUB_ADMIN=loic MSSUB_ADMIN_MOTDEPASSE='...' \
+     MSSUB_SOURCE=https://github.com/lve-mssec/MSSub MSSUB_REFERENCE=v1.1.0 \
+     MSSUB_SANS_QUESTION=1 \
+     ./deploy/installer-debian-13.sh
+```
+
+Variables reconnues : `MSSUB_DOMAINE`, `MSSUB_RACINE`, `MSSUB_SOURCE`,
+`MSSUB_REFERENCE`, `MSSUB_BASE`, `MSSUB_BASE_UTILISATEUR`,
+`MSSUB_BASE_MOTDEPASSE`, `MSSUB_BASE_MOTDEPASSE_AUTO`, `MSSUB_ADMIN`,
+`MSSUB_ADMIN_MOTDEPASSE`, `MSSUB_APP_SECRET`, `MSSUB_TLS`, `MSSUB_TLS_COURRIEL`.
+
+### Ce qu'il fait, dans l'ordre
+
+1. Paquets et contrôle des extensions PHP
+2. Base MariaDB et son compte
+3. Déploiement du code
+4. `.env.local`, avec contrôle du secret applicatif
+5. Dépendances Composer, en environnement de production
+6. Migrations, compilation des ressources, cache
+7. Compte administrateur — mot de passe passé par l'entrée standard, jamais en
+   argument de ligne de commande où il serait visible dans la liste des processus
+8. Droits : code en lecture seule pour le serveur, seuls `var/` et
+   `public/assets/` inscriptibles
+9. Apache et réglages PHP, puis certificat TLS le cas échéant
+
+Il termine par une vérification : connexion à la base, redirection de `/` vers
+la page de connexion, affichage de celle-ci.
+
+## Installation manuelle
+
+Ce qui suit décrit les mêmes gestes, un par un — utile pour adapter à une
+infrastructure existante, ou pour comprendre ce que le script fait.
+
 ## 1. Paquets
 
 ```bash
