@@ -68,12 +68,10 @@ sudo mkdir -p /var/www/mssub
 sudo chown "$USER" /var/www/mssub
 git clone <dépôt> /var/www/mssub
 cd /var/www/mssub
-
-composer install --no-dev --optimize-autoloader
 ```
 
-`--no-dev` écarte PHPUnit et les outils de développement ; `--optimize-autoloader`
-évite de parcourir le disque à chaque classe chargée.
+**N'installez pas encore les dépendances** : la configuration doit exister
+d'abord. L'étape suivante explique pourquoi.
 
 ## 4. Configuration
 
@@ -102,12 +100,38 @@ l'interface, sans toucher à ce fichier. Les variables d'environnement décrites
 dans `.env` restent disponibles comme valeurs de repli si vous préférez figer la
 configuration au déploiement.
 
+### Dépendances
+
+```bash
+cd /var/www/mssub
+APP_ENV=prod APP_DEBUG=0 composer install --no-dev --optimize-autoloader
+```
+
+`--no-dev` écarte PHPUnit et les outils de développement ; `--optimize-autoloader`
+évite de parcourir le disque à chaque classe chargée.
+
+**`APP_ENV=prod` n'est pas décoratif ici.** Composer enchaîne un `cache:clear`
+après l'installation, qui démarre l'application. Sans cette variable — et tant
+que `.env.local` n'existe pas — elle démarrerait en environnement de
+développement et chercherait `DoctrineFixturesBundle`, que `--no-dev` vient
+précisément de retirer :
+
+```
+Attempted to load class "DoctrineFixturesBundle"
+    from namespace "Doctrine\Bundle\FixturesBundle".
+Script cache:clear returned with error code 255
+```
+
+L'installation des paquets, elle, a bien eu lieu : seul le script de fin a
+échoué. Si vous rencontrez cette erreur, créez `.env.local` puis relancez
+`php bin/console cache:clear` — inutile de tout recommencer.
+
 ## 5. Base et ressources
 
 ```bash
 cd /var/www/mssub
-php bin/console doctrine:migrations:migrate --no-interaction
-php bin/console asset-map:compile
+php bin/console doctrine:migrations:migrate --no-interaction --env=prod
+php bin/console asset-map:compile --env=prod
 php bin/console cache:clear --env=prod
 php bin/console cache:warmup --env=prod
 ```
@@ -239,16 +263,22 @@ existant.
 
 ```bash
 cd /var/www/mssub
-sudo -u www-data php bin/console doctrine:database:dump 2>/dev/null || \
-    mysqldump -u mssub -p mssub > ~/mssub-avant-maj.sql
+
+# Toujours avant une migration : elle n'est pas réversible sans sauvegarde.
+mysqldump --single-transaction -u mssub -p mssub > ~/mssub-avant-maj.sql
 
 git pull
-composer install --no-dev --optimize-autoloader
-php bin/console doctrine:migrations:migrate --no-interaction
-php bin/console asset-map:compile
+APP_ENV=prod APP_DEBUG=0 composer install --no-dev --optimize-autoloader
+php bin/console doctrine:migrations:migrate --no-interaction --env=prod
+php bin/console asset-map:compile --env=prod
 php bin/console cache:clear --env=prod
 sudo systemctl reload apache2
 ```
+
+`APP_ENV=prod` devant `composer install` pour la même raison qu'à
+l'installation, et `--env=prod` sur chaque commande : `.env.local` le dit déjà,
+mais l'expliciter évite qu'une console lancée depuis un autre répertoire ou par
+un autre compte ne retombe silencieusement sur l'environnement de développement.
 
 ## Sauvegarde
 
