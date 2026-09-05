@@ -130,6 +130,38 @@ class Subnet
         return \sprintf('%s/%d', $this->networkAddress ?? '?', $this->prefixLength);
     }
 
+    /**
+     * Le site auquel ce reseau appartient reellement, heritage compris.
+     *
+     * Un sous-reseau declare rarement son site : il le tient du bloc qui le
+     * contient. Decouper 10.10.0.0/16 « Paris » en /24 ne devrait pas obliger a
+     * repeter « Paris » sur chacun, et un plan importe ne le fera de toute
+     * facon pas. Le site effectif est donc le sien, ou celui du plus proche
+     * ancetre qui en porte un.
+     *
+     * La profondeur est bornee : une hierarchie corrompue par une reprise de
+     * donnees ne doit pas faire tourner l'affichage en rond.
+     */
+    public function getEffectiveSite(): ?Site
+    {
+        $node = $this;
+
+        for ($depth = 0; $depth < 64 && null !== $node; ++$depth) {
+            if (null !== $node->site) {
+                return $node->site;
+            }
+            $node = $node->parent;
+        }
+
+        return null;
+    }
+
+    /** Vrai si le site vient d'un bloc parent plutot que d'une declaration propre. */
+    public function inheritsSite(): bool
+    {
+        return null === $this->site && null !== $this->getEffectiveSite();
+    }
+
     /** Un conteneur n'accueille que des sous-reseaux ; lui affecter des IP n'a pas de sens. */
     public function isContainer(): bool
     {

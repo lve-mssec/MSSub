@@ -57,6 +57,8 @@
     </nav>
 
     <main class="content">
+        {{ render(controller('App\\Controller\\ContextController::bar')) }}
+
         {% for type, messages in app.flashes %}
             {% for message in messages %}
                 <div class="flash flash--{{ type }} no-print">{{ message }}</div>
@@ -66,5 +68,6 @@
         {% block body %}{% endblock %}
     </main>
 </div>
+    <script src="{{ asset('context.js') }}" defer></script>
 </body>
 </html>

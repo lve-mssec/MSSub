@@ -48,6 +48,25 @@ docker compose exec -T db mariadb -uroot -proot < docker/mariadb/init/02-test-da
 docker compose exec app php bin/console --env=test doctrine:schema:create
 ```
 
+## Organisations et sites
+
+Le référentiel se lit à deux niveaux : **organisation**, puis **site**. Une barre
+de périmètre en tête de page permet de se placer dans l'un ou l'autre ; le choix
+est retenu en session et filtre les plans d'adressage, le tableau de bord et les
+exports CSV. La recherche d'adresse suit l'organisation mais ignore le site :
+on cherche une adresse justement parce qu'on ignore d'où elle vient.
+
+**Un réseau appartient au site de son bloc parent** s'il n'en déclare pas.
+Découper `10.10.0.0/16` « Paris » en `/24` n'oblige donc pas à répéter « Paris »
+sur chacun, et un plan importé ne le fera de toute façon pas. L'arborescence
+indique « (hérité) » pour distinguer un rattachement déduit d'un rattachement
+saisi.
+
+Chaque site a sa fiche — `/sites/{id}` — avec son occupation agrégée, ses
+réseaux, ses VLAN et ses équipements. Les blocs conteneurs sont exclus du total :
+additionner un bloc et les sous-réseaux qu'il contient compterait deux fois les
+mêmes adresses.
+
 ## Administration
 
 Tout ce qui se configurait par variables d'environnement se règle désormais

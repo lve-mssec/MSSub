@@ -566,3 +566,46 @@ input[type="file"] {
 
 .card--link .card__title { display: flex; align-items: center; gap: 8px; }
 .card--link p:last-child { margin-bottom: 0; }
+
+/* ---------- Barre de périmètre ---------- */
+
+.context-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+}
+
+.context-bar__label {
+    margin: 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-3);
+}
+
+.context-bar select { width: auto; min-width: 170px; }
+
+.context-bar__clear {
+    font-size: 12px;
+    color: var(--text-2);
+    text-decoration: none;
+    border-bottom: 1px solid var(--line);
+}
+
+.context-bar__clear:hover { color: var(--orange); border-bottom-color: var(--orange); }
+
+.site-heading {
+    flex: 1;
+    margin: 22px 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.site-heading a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--line); }
+.site-heading a:hover { color: var(--orange); border-bottom-color: var(--orange); }
+.site-heading .muted { font-weight: 400; font-size: 12px; margin-left: 6px; }

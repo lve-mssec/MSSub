@@ -5,7 +5,12 @@
 {% block body %}
     <div class="page-head">
         <h1>Rechercher une adresse</h1>
-        <p>Retrouve le réseau qui contient une adresse, et ce qui y est documenté.</p>
+        <p>
+            Retrouve le réseau qui contient une adresse, et ce qui y est documenté.
+            {% if restricted %}
+                Limitée à <strong>{{ context }}</strong> — le site sélectionné ne restreint pas la recherche.
+            {% endif %}
+        </p>
     </div>
 
     <form method="get" class="card no-print">

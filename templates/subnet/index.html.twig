@@ -6,7 +6,13 @@
     <div class="page-head page-head--with-action">
         <div>
             <h1>Plans d'adressage</h1>
-            <p>Hiérarchie des blocs et des sous-réseaux, par organisation.</p>
+            <p>
+                {% if restricted %}
+                    Périmètre : <strong>{{ context }}</strong>.
+                {% else %}
+                    Hiérarchie des blocs et des sous-réseaux, par organisation et par site.
+                {% endif %}
+            </p>
         </div>
         {% if is_granted('ROLE_OPERATOR') %}
             <a class="btn no-print" href="{{ path('app_subnet_new') }}">Nouveau réseau</a>
@@ -14,19 +20,31 @@
     </div>
 
     {% for entry in trees %}
-        <div class="section-head">
+        {% if trees|length > 1 or not restricted %}
             <h2 class="section">{{ entry.organization.name }}</h2>
-            {% if entry.rows is not empty %}
+        {% endif %}
+
+        {% if entry.groups is empty %}
+            <div class="note">Aucun réseau dans ce périmètre.</div>
+        {% endif %}
+
+        {% for group in entry.groups %}
+            <div class="section-head">
+                <h3 class="site-heading">
+                    {% if group.site %}
+                        <a href="{{ path('app_site_show', {id: group.site.id}) }}">{{ group.site.name }}</a>
+                        <span class="muted">{{ group.site.code }}</span>
+                    {% else %}
+                        Sans site
+                        <span class="muted">non rattaché</span>
+                    {% endif %}
+                </h3>
                 <div class="section-head__actions no-print">
                     <button type="button" class="btn btn--quiet btn--small" data-tree-all="expand">Tout déplier</button>
                     <button type="button" class="btn btn--quiet btn--small" data-tree-all="collapse">Tout plier</button>
                 </div>
-            {% endif %}
-        </div>
+            </div>
 
-        {% if entry.rows is empty %}
-            <div class="note">Aucun bloc déclaré pour cette organisation.</div>
-        {% else %}
             <div class="table-wrap">
                 <table class="tree-table" data-tree>
                     <thead>
@@ -40,12 +58,12 @@
                     </tr>
                     </thead>
                     <tbody>
-                    {% for row in entry.rows %}
+                    {% for row in group.rows %}
                         <tr data-id="{{ row.subnet.id }}"
                             data-parent="{{ row.parentId ?? '' }}"
-                            data-depth="{{ row.depth }}">
+                            data-depth="{{ row.indent }}">
                             <td class="cidr">
-                                <span class="tree-cell" style="padding-left: {{ row.depth * 18 }}px">
+                                <span class="tree-cell" style="padding-left: {{ row.indent * 18 }}px">
                                     {% if row.hasChildren %}
                                         <button type="button" class="tree-toggle no-print"
                                                 aria-expanded="true"
@@ -63,7 +81,16 @@
                                 </span>
                             </td>
                             <td class="muted">{{ row.subnet.vlan ? row.subnet.vlan.number : '—' }}</td>
-                            <td class="muted">{{ row.subnet.site ? row.subnet.site.name : '—' }}</td>
+                            <td class="muted">
+                                {% if row.subnet.site %}
+                                    {{ row.subnet.site.name }}
+                                {% elseif row.subnet.inheritsSite %}
+                                    {# Le site vient d'un bloc parent : le dire évite de croire à une saisie manquante. #}
+                                    <span title="Hérité du bloc parent">{{ row.subnet.effectiveSite.name }} <span class="muted">(hérité)</span></span>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
                             <td class="col-usage">
                                 {% if row.usage %}
                                     <div class="usage">
@@ -81,7 +108,7 @@
                     </tbody>
                 </table>
             </div>
-        {% endif %}
+        {% endfor %}
     {% else %}
         <div class="note">Aucune organisation déclarée.</div>
     {% endfor %}

@@ -12,6 +12,7 @@ use App\Service\AuditRecorder;
 use App\Service\Export\CsvExporter;
 use App\Service\Export\DhcpConfigExporter;
 use App\Service\Export\DnsZoneExporter;
+use App\Service\ViewContext;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -25,15 +26,19 @@ final class ExportController extends AbstractController
     public function __construct(
         private readonly AuditRecorder $audit,
         private readonly EntityManagerInterface $em,
+        private readonly ViewContext $context,
     ) {
     }
 
     #[Route('/export', name: 'app_export')]
     public function index(OrganizationRepository $organizations): Response
     {
+        $scope = $this->context->organization();
+
         return $this->render('export/index.html.twig', [
             'nav' => 'export',
-            'organizations' => $organizations->findBy([], ['name' => 'ASC']),
+            'organizations' => null === $scope ? $organizations->findBy([], ['name' => 'ASC']) : [$scope],
+            'site' => $this->context->site(),
         ]);
     }
 
@@ -41,7 +46,7 @@ final class ExportController extends AbstractController
     public function subnets(Organization $organization, CsvExporter $exporter): Response
     {
         return $this->download(
-            $exporter->subnets($organization),
+            $exporter->subnets($organization, $this->siteFor($organization)),
             \sprintf('mssub-reseaux-%s.csv', $this->slug($organization)),
             'text/csv; charset=UTF-8',
             $organization,
@@ -53,7 +58,7 @@ final class ExportController extends AbstractController
     public function addresses(Organization $organization, CsvExporter $exporter): Response
     {
         return $this->download(
-            $exporter->addresses($organization),
+            $exporter->addresses($organization, $this->siteFor($organization)),
             \sprintf('mssub-adresses-%s.csv', $this->slug($organization)),
             'text/csv; charset=UTF-8',
             $organization,
@@ -126,6 +131,19 @@ final class ExportController extends AbstractController
         );
 
         return $response;
+    }
+
+    /**
+     * Le site du périmètre, s'il concerne bien cette organisation.
+     *
+     * Un export déclenché sur une autre organisation que celle du périmètre ne
+     * doit pas se retrouver vidé par un site qui ne lui appartient pas.
+     */
+    private function siteFor(?Organization $organization): ?\App\Entity\Site
+    {
+        $site = $this->context->site();
+
+        return null !== $site && $site->getOrganization() === $organization ? $site : null;
     }
 
     private function domain(Request $request): string

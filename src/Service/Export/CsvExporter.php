@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Service\Export;
 
 use App\Entity\Organization;
+use App\Entity\Site;
+use App\Entity\Subnet;
 use App\Repository\IpAddressRepository;
 use App\Repository\SubnetRepository;
 use League\Csv\Writer;
@@ -36,11 +38,11 @@ final class CsvExporter
     ) {
     }
 
-    public function subnets(Organization $organization): string
+    public function subnets(Organization $organization, ?Site $site = null): string
     {
         $csv = $this->writer(self::SUBNET_HEADER);
 
-        foreach ($this->subnets->findBy(['organization' => $organization], ['networkAddress' => 'ASC', 'prefixLength' => 'ASC']) as $subnet) {
+        foreach ($this->retained($organization, $site) as $subnet) {
             $csv->insertOne([
                 $subnet->getCidr(),
                 $subnet->getName() ?? '',
@@ -59,11 +61,11 @@ final class CsvExporter
         return $csv->toString();
     }
 
-    public function addresses(Organization $organization): string
+    public function addresses(Organization $organization, ?Site $site = null): string
     {
         $csv = $this->writer(self::ADDRESS_HEADER);
 
-        foreach ($this->subnets->findBy(['organization' => $organization], ['networkAddress' => 'ASC', 'prefixLength' => 'ASC']) as $subnet) {
+        foreach ($this->retained($organization, $site) as $subnet) {
             foreach ($this->addresses->findBySubnet($subnet) as $address) {
                 $csv->insertOne([
                     $subnet->getCidr(),
@@ -77,6 +79,28 @@ final class CsvExporter
         }
 
         return $csv->toString();
+    }
+
+    /**
+     * Les reseaux du perimetre, site effectif compris.
+     *
+     * @return list<Subnet>
+     */
+    private function retained(Organization $organization, ?Site $site): array
+    {
+        $all = $this->subnets->findBy(
+            ['organization' => $organization],
+            ['networkAddress' => 'ASC', 'prefixLength' => 'ASC'],
+        );
+
+        if (null === $site) {
+            return $all;
+        }
+
+        return array_values(array_filter(
+            $all,
+            static fn (Subnet $subnet): bool => $subnet->getEffectiveSite()?->getId() === $site->getId(),
+        ));
     }
 
     /** @param list<string> $header */

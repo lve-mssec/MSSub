@@ -5,7 +5,13 @@
 {% block body %}
     <div class="page-head">
         <h1>Tableau de bord</h1>
-        <p>État du référentiel d'adressage.</p>
+        <p>
+            {% if restricted %}
+                Périmètre : <strong>{{ context }}</strong>.
+            {% else %}
+                État du référentiel d'adressage.
+            {% endif %}
+        </p>
     </div>
 
     <div class="grid grid--stats">

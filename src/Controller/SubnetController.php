@@ -11,8 +11,10 @@ use App\Repository\OrganizationRepository;
 use App\Repository\SubnetRepository;
 use App\Exception\AllocationException;
 use App\Form\SubnetType;
+use App\Entity\Site;
 use App\Service\AllocationService;
 use App\Service\IpAllocator;
+use App\Service\ViewContext;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -29,13 +31,17 @@ final class SubnetController extends AbstractController
         SubnetRepository $subnets,
         IpAddressRepository $addresses,
         IpAllocator $ipAllocator,
+        ViewContext $context,
     ): Response {
         // Une seule requete pour toute l'occupation : l'arborescence peut
         // compter des centaines de lignes, un comptage par ligne serait ruineux.
         $taken = $addresses->countTakenGroupedBySubnet();
 
+        $scope = $context->organization();
+        $selectedSite = $context->site();
+
         $trees = [];
-        foreach ($organizations->findBy([], ['name' => 'ASC']) as $organization) {
+        foreach (null === $scope ? $organizations->findBy([], ['name' => 'ASC']) : [$scope] as $organization) {
             \assert($organization instanceof Organization);
 
             $rows = [];
@@ -43,13 +49,72 @@ final class SubnetController extends AbstractController
                 $this->flatten($root, 0, null, $subnets, $taken, $ipAllocator, $rows);
             }
 
-            $trees[] = ['organization' => $organization, 'rows' => $rows];
+            $groups = $this->groupBySite($rows, $selectedSite);
+
+            if ([] !== $groups || null === $selectedSite) {
+                $trees[] = ['organization' => $organization, 'groups' => $groups];
+            }
         }
 
         return $this->render('subnet/index.html.twig', [
             'nav' => 'subnets',
             'trees' => $trees,
+            'context' => $context->label(),
+            'restricted' => $context->isRestricted(),
         ]);
+    }
+
+    /**
+     * Regroupe les lignes par site effectif.
+     *
+     * Le regroupement suit la realite du plan : un bloc « Paris » et tout ce
+     * qu'il contient forment un groupe, meme si les sous-reseaux ne declarent
+     * pas leur site. Le bloc racine sans site, lui, se retrouve seul dans
+     * « Sans site » — ce qui est exact, et rend visible ce qui n'est rattache
+     * a rien.
+     *
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return list<array{site: Site|null, rows: list<array<string, mixed>>}>
+     */
+    private function groupBySite(array $rows, ?Site $only): array
+    {
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $site = $row['subnet']->getEffectiveSite();
+
+            if (null !== $only && $site?->getId() !== $only->getId()) {
+                continue;
+            }
+
+            $key = null === $site ? 'aucun' : (string) $site->getId();
+            $groups[$key] ??= ['site' => $site, 'rows' => []];
+            $groups[$key]['rows'][] = $row;
+        }
+
+        foreach ($groups as $key => $group) {
+            $depths = array_column($group['rows'], 'depth');
+            $base = [] === $depths ? 0 : min($depths);
+            $present = array_flip(array_map(
+                static fn (array $row): int => (int) $row['subnet']->getId(),
+                $group['rows'],
+            ));
+
+            foreach ($group['rows'] as $index => $row) {
+                $groups[$key]['rows'][$index]['indent'] = $row['depth'] - $base;
+
+                // Un parent reste dans un autre groupe lorsqu'il ne porte pas le
+                // meme site : la ligne devient alors une racine de ce groupe,
+                // sans quoi le pliage tenterait de se rattacher a une ligne
+                // absente de la table.
+                if (null !== $row['parentId'] && !isset($present[$row['parentId']])) {
+                    $groups[$key]['rows'][$index]['parentId'] = null;
+                }
+            }
+        }
+
+        return array_values($groups);
     }
 
     /**

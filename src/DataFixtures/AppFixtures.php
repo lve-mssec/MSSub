@@ -77,10 +77,13 @@ final class AppFixtures extends Fixture
             ->setDhcpRangeStart('10.10.10.100')
             ->setDhcpRangeEnd('10.10.10.200');
 
-        $lanServers = $this->subnet($manager, $mssec, '10.10.20.0/24', 'LAN Serveurs', SubnetStatus::Active, $blocParis, $paris, $vlanServers);
+        // Ni ce réseau ni la DMZ ne déclarent leur site : ils le tiennent du
+        // bloc parisien, comme dans un plan réel où l'on ne répète pas le site
+        // sur chaque découpe.
+        $lanServers = $this->subnet($manager, $mssec, '10.10.20.0/24', 'LAN Serveurs', SubnetStatus::Active, $blocParis, null, $vlanServers);
         $lanServers->setGateway('10.10.20.254')->setDnsServers(['10.10.20.10']);
 
-        $dmz = $this->subnet($manager, $mssec, '10.10.30.0/26', 'DMZ', SubnetStatus::Active, $blocParis, $paris, $vlanDmz);
+        $dmz = $this->subnet($manager, $mssec, '10.10.30.0/26', 'DMZ', SubnetStatus::Active, $blocParis, null, $vlanDmz);
         $dmz->setGateway('10.10.30.62');
 
         $this->subnet($manager, $mssec, '10.10.40.0/24', 'Réservé — extension', SubnetStatus::Reserved, $blocParis, $paris);

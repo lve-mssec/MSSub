@@ -1,0 +1,148 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ site.name }} — MSSub{% endblock %}
+
+{% block body %}
+    <p class="breadcrumb">
+        <a href="{{ path('app_subnet_index') }}">Plans d'adressage</a>
+        <span>›</span> {{ site.organization.name }}
+        <span>›</span> {{ site.name }}
+    </p>
+
+    <div class="page-head page-head--with-action">
+        <div>
+            <h1>{{ site.name }}</h1>
+            <p>
+                {{ site.organization.name }} · <code class="inline">{{ site.code }}</code>
+                {%- if site.city %} · {{ site.city }}{% endif %}
+                {%- if site.country %} · {{ site.country }}{% endif %}
+            </p>
+        </div>
+        {% if not in_context %}
+            <form method="post" action="{{ path('app_context') }}" class="no-print">
+                <input type="hidden" name="_token" value="{{ csrf_token('contexte') }}">
+                <input type="hidden" name="organisation" value="{{ site.organization.id }}">
+                <input type="hidden" name="site" value="{{ site.id }}">
+                <button class="btn btn--quiet" type="submit">Travailler dans ce site</button>
+            </form>
+        {% endif %}
+    </div>
+
+    <div class="grid grid--stats">
+        <div class="card">
+            <div class="stat__value">{{ percent }} %</div>
+            <div class="stat__label">occupation</div>
+            <div class="gauge" style="margin-top:10px">
+                <div class="gauge__fill" style="width: {{ min(percent, 100) }}%"></div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="stat__value">{{ used }}</div>
+            <div class="stat__label">adresses utilisées sur {{ usable }}</div>
+        </div>
+        <div class="card">
+            <div class="stat__value">{{ rows|length }}</div>
+            <div class="stat__label">réseaux</div>
+        </div>
+        <div class="card">
+            <div class="stat__value">{{ site.vlans|length }}</div>
+            <div class="stat__label">VLAN</div>
+        </div>
+        <div class="card">
+            <div class="stat__value">{{ site.devices|length }}</div>
+            <div class="stat__label">équipements</div>
+        </div>
+    </div>
+
+    {% if site.address %}
+        <h2 class="section">Adresse</h2>
+        <div class="card"><p class="reason" style="margin:0">{{ site.address|nl2br }}</p></div>
+    {% endif %}
+
+    <h2 class="section">Réseaux</h2>
+    {% if rows is empty %}
+        <div class="note">
+            Aucun réseau rattaché à ce site, ni directement ni par un bloc parent.
+        </div>
+    {% else %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Réseau</th><th>Nom</th><th>État</th><th>VLAN</th><th>Rattachement</th><th class="col-usage">Occupation</th></tr></thead>
+                <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td class="cidr"><a href="{{ path('app_subnet_show', {id: row.subnet.id}) }}">{{ row.subnet.cidr }}</a></td>
+                        <td class="reason">{{ row.subnet.name ?? '—' }}</td>
+                        <td>
+                            <span class="pill pill--{{ row.subnet.status.value == 'container' ? 'container' : (row.subnet.status.value == 'reserved' ? 'reserved' : 'used') }}">
+                                {{ row.subnet.status.label }}
+                            </span>
+                        </td>
+                        <td class="muted">{{ row.subnet.vlan ? row.subnet.vlan.number : '—' }}</td>
+                        <td class="muted">{{ row.inherited ? 'hérité du bloc parent' : 'déclaré' }}</td>
+                        <td class="col-usage">
+                            {% if row.usage %}
+                                <div class="usage">
+                                    <div class="gauge">
+                                        <div class="gauge__fill" style="width: {{ min(row.usage.percent, 100) }}%"></div>
+                                    </div>
+                                    <span class="usage__text">{{ row.usage.used }}/{{ row.usage.usable }}</span>
+                                </div>
+                            {% else %}
+                                <span class="muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    <div class="grid grid--two">
+        <div>
+            <h2 class="section">VLAN</h2>
+            {% if site.vlans is empty %}
+                <div class="note">Aucun VLAN déclaré sur ce site.</div>
+            {% else %}
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Numéro</th><th>Nom</th><th>Description</th></tr></thead>
+                        <tbody>
+                        {% for vlan in site.vlans %}
+                            <tr>
+                                <td class="cidr">{{ vlan.number }}</td>
+                                <td>{{ vlan.name }}</td>
+                                <td class="reason">{{ vlan.description ?? '—' }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+
+        <div>
+            <h2 class="section">Équipements</h2>
+            {% if site.devices is empty %}
+                <div class="note">Aucun équipement rattaché à ce site.</div>
+            {% else %}
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Nom</th><th>Type</th><th>Modèle</th><th>Interfaces</th></tr></thead>
+                        <tbody>
+                        {% for device in site.devices %}
+                            <tr>
+                                <td>{{ device.name }}</td>
+                                <td class="muted">{{ device.type.label }}</td>
+                                <td class="muted">{{ device.model ?? '—' }}</td>
+                                <td class="muted">{{ device.interfaces|length }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

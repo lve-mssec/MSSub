@@ -5,7 +5,13 @@
 {% block body %}
     <div class="page-head">
         <h1>Export</h1>
-        <p>Extraire le référentiel, ou alimenter DNS et DHCP.</p>
+        <p>
+            Extraire le référentiel, ou alimenter DNS et DHCP.
+            {% if site %}
+                Les exports CSV sont limités au site <strong>{{ site.name }}</strong> ;
+                les fragments DNS et DHCP portent sur l'organisation entière.
+            {% endif %}
+        </p>
     </div>
 
     {% for organization in organizations %}

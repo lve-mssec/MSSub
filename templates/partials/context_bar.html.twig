@@ -1,0 +1,36 @@
+{#
+   Barre de périmètre.
+
+   Le formulaire se soumet au changement pour éviter un bouton de plus, mais
+   reste utilisable sans JavaScript grâce au bouton « Appliquer », affiché
+   uniquement lorsque le script n'a pas pris la main.
+#}
+<form method="post" action="{{ path('app_context') }}" class="context-bar no-print" data-context>
+    <input type="hidden" name="_token" value="{{ csrf_token('contexte') }}">
+
+    <label class="context-bar__label" for="contexte-organisation">Périmètre</label>
+
+    <select id="contexte-organisation" name="organisation">
+        <option value="">Tout le référentiel</option>
+        {% for organization in organizations %}
+            <option value="{{ organization.id }}" {{ current_organization and organization.id == current_organization.id ? 'selected' }}>
+                {{ organization.name }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <select id="contexte-site" name="site" {{ sites is empty ? 'disabled' }}>
+        <option value="">{{ sites is empty ? 'Aucun site' : 'Tous les sites' }}</option>
+        {% for site in sites %}
+            <option value="{{ site.id }}" {{ current_site and site.id == current_site.id ? 'selected' }}>
+                {{ site.name }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <button class="btn btn--quiet btn--small" type="submit" data-context-submit>Appliquer</button>
+
+    {% if current_organization %}
+        <a class="context-bar__clear" href="#" data-context-clear>Tout voir</a>
+    {% endif %}
+</form>

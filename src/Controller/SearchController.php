@@ -9,6 +9,7 @@ use App\Repository\IpAddressRepository;
 use App\Repository\OrganizationRepository;
 use App\Repository\SubnetRepository;
 use App\Service\IpTools;
+use App\Service\ViewContext;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,7 +24,9 @@ final class SearchController extends AbstractController
         SubnetRepository $subnets,
         IpAddressRepository $addresses,
         IpTools $ip,
+        ViewContext $context,
     ): Response {
+        $scope = $context->organization();
         $query = trim((string) $request->query->get('ip', ''));
         $error = null;
         $results = [];
@@ -37,7 +40,7 @@ final class SearchController extends AbstractController
             }
 
             if (null === $error) {
-                foreach ($organizations->findBy([], ['name' => 'ASC']) as $organization) {
+                foreach (null === $scope ? $organizations->findBy([], ['name' => 'ASC']) : [$scope] as $organization) {
                     \assert($organization instanceof Organization);
                     $chain = $subnets->findContainingChain($query, $organization);
                     if ([] !== $chain) {
@@ -54,6 +57,11 @@ final class SearchController extends AbstractController
             'error' => $error,
             'results' => $results,
             'documented' => $documented,
+            'context' => $context->label(),
+            // La recherche suit l'organisation mais ignore le site : une adresse
+            // se cherche parce qu'on ne sait pas d'ou elle vient, et la masquer
+            // au motif qu'elle appartient a un autre site irait contre l'usage.
+            'restricted' => null !== $scope,
         ]);
     }
 }
