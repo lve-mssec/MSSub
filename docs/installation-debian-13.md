@@ -64,6 +64,21 @@ Variables reconnues : `MSSUB_DOMAINE`, `MSSUB_RACINE`, `MSSUB_SOURCE`,
 Il termine par une vérification : connexion à la base, redirection de `/` vers
 la page de connexion, affichage de celle-ci.
 
+### En cas d'échec
+
+Chaque commande consigne sa sortie complète dans `/var/log/mssub-installation.log`.
+Si une étape échoue, le script affiche les trente dernières lignes du journal
+puis s'arrête — il n'y a rien à deviner.
+
+Deux situations sont détectées explicitement plutôt que de dégénérer plus loin :
+
+- **le répertoire d'installation existe, n'est pas un dépôt git et n'est pas
+  vide** — un clone n'y est pas possible ; déplacez-le ou changez de répertoire ;
+- **le code n'a pas été déployé** (`composer.json` absent après l'étape 3) — la
+  source ou la référence indiquée ne contient pas MSSub. Sans ce contrôle,
+  l'échec n'apparaîtrait que deux étapes plus loin, sous la forme d'un
+  « Composer could not find a composer.json file » sans rapport apparent.
+
 ## Installation manuelle
 
 Ce qui suit décrit les mêmes gestes, un par un — utile pour adapter à une

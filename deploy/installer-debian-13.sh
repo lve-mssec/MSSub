@@ -37,7 +37,7 @@ echouer() { printf '\n%s✗ %s%s\n\n' "$ROUGE" "$1" "$NORMAL" >&2; exit 1; }
 
 # Une erreur non traitée doit dire où elle s'est produite, plutôt que de laisser
 # une installation à moitié faite sans explication.
-trap 'echouer "Échec ligne $LINENO. Corrigez la cause puis relancez : le script est rejouable."' ERR
+trap 'echouer "Échec ligne $LINENO. Détail dans ${JOURNAL:-le journal} ; le script est rejouable."' ERR
 
 # --------------------------------------------------------------------- outils
 
@@ -54,6 +54,39 @@ urlencoder() {
         esac
     done
     printf '%s' "$sortie"
+}
+
+# Journal d'installation. Les commandes longues y écrivent leur sortie complète :
+# à l'écran elles n'affichent qu'une ligne, mais en cas d'échec le détail est
+# disponible — un installeur qui échoue sans dire pourquoi ne sert à rien.
+JOURNAL="${MSSUB_JOURNAL:-/var/log/mssub-installation.log}"
+
+echouer_avec_journal() {
+    printf '\n%s✗ %s%s\n' "$ROUGE" "$1" "$NORMAL" >&2
+    printf '\n   %sDernières lignes de %s :%s\n\n' "$GRIS" "$JOURNAL" "$NORMAL" >&2
+    tail -n 30 "$JOURNAL" 2>/dev/null | sed 's/^/     /' >&2
+    printf '\n   %sJournal complet : %s%s\n\n' "$GRIS" "$JOURNAL" "$NORMAL" >&2
+    exit 1
+}
+
+# Exécute une commande en consignant sa sortie, et rend l'échec lisible.
+executer() {
+    local description="$1"; shift
+
+    # La ligne de progression n'a de sens que sur un terminal : redirigée dans un
+    # fichier, le retour chariot ne recouvre rien et chaque étape apparaîtrait
+    # deux fois.
+    if [[ -t 1 ]]; then
+        printf '   %s…\r' "$description"
+    fi
+
+    if "$@" >>"$JOURNAL" 2>&1; then
+        [[ -t 1 ]] && printf '\033[2K\r'
+        succes "$description"
+    else
+        [[ -t 1 ]] && printf '\033[2K\r'
+        echouer_avec_journal "$description"
+    fi
 }
 
 # Engendre une chaîne hexadécimale aléatoire.
@@ -253,14 +286,18 @@ readonly MSSUB_BASE MSSUB_BASE_UTILISATEUR MSSUB_ADMIN MSSUB_TLS
 titre "1/9 — Paquets"
 
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y -qq --no-install-recommends \
+
+: > "$JOURNAL" || echouer "Impossible d'écrire dans $JOURNAL."
+chmod 600 "$JOURNAL"
+detail "Journal détaillé : $JOURNAL"
+
+executer "Mise à jour de la liste des paquets" apt-get update -qq
+executer "Installation des paquets" apt-get install -y -qq --no-install-recommends \
     apache2 mariadb-server \
     php8.4 libapache2-mod-php8.4 php8.4-cli \
     php8.4-mysql php8.4-intl php8.4-zip php8.4-ldap php8.4-gd \
     php8.4-mbstring php8.4-xml php8.4-curl php8.4-opcache \
-    composer git unzip openssl curl >/dev/null
-succes "Paquets installés"
+    composer git unzip openssl curl
 
 for extension in intl pdo_mysql ldap zip gd mbstring sodium; do
     php -m | grep -qx "$extension" || echouer "Extension PHP manquante : $extension"
@@ -293,16 +330,42 @@ succes "Base « $MSSUB_BASE » et compte « $MSSUB_BASE_UTILISATEUR » prêts"
 
 titre "3/9 — Code"
 
+# Un répertoire déjà peuplé mais sans dépôt git ne peut pas recevoir un clone.
+# Le dire franchement vaut mieux que d'échouer trois étapes plus loin sur une
+# erreur qui n'a plus rien à voir.
+if [[ -d "$MSSUB_RACINE" && ! -d "$MSSUB_RACINE/.git" ]] \
+    && [[ -n "$(ls -A "$MSSUB_RACINE" 2>/dev/null)" ]]; then
+    echouer "$MSSUB_RACINE existe, n'est pas un dépôt git, et n'est pas vide.
+   Déplacez-le (mv $MSSUB_RACINE ${MSSUB_RACINE}.ancien) ou choisissez un autre
+   répertoire, puis relancez."
+fi
+
 if [[ -d "$MSSUB_RACINE/.git" ]]; then
-    git -C "$MSSUB_RACINE" fetch --all --tags --quiet
-    git -C "$MSSUB_RACINE" checkout --quiet "$MSSUB_REFERENCE"
-    git -C "$MSSUB_RACINE" pull --quiet --ff-only 2>/dev/null || true
-    succes "Dépôt existant mis à jour sur $MSSUB_REFERENCE"
+    # Une réexécution retrouve une arborescence appartenant à root et non
+    # inscriptible : on la rouvre le temps du déploiement, elle sera refermée
+    # à l'étape des droits.
+    chown -R root:root "$MSSUB_RACINE"
+    chmod -R u+w "$MSSUB_RACINE"
+    git config --global --add safe.directory "$MSSUB_RACINE" 2>/dev/null || true
+
+    executer "Récupération des modifications" git -C "$MSSUB_RACINE" fetch --all --tags
+    executer "Bascule sur $MSSUB_REFERENCE" git -C "$MSSUB_RACINE" checkout --force "$MSSUB_REFERENCE"
+    git -C "$MSSUB_RACINE" pull --ff-only >>"$JOURNAL" 2>&1 || true
+    succes "Dépôt existant mis à jour"
 else
     mkdir -p "$(dirname "$MSSUB_RACINE")"
-    git clone --quiet --branch "$MSSUB_REFERENCE" "$MSSUB_SOURCE" "$MSSUB_RACINE"
-    succes "Code déployé dans $MSSUB_RACINE"
+    executer "Clonage du code" git clone --branch "$MSSUB_REFERENCE" "$MSSUB_SOURCE" "$MSSUB_RACINE"
 fi
+
+# Contrôle explicite : sans lui, une étape 3 qui n'a rien déployé se traduirait
+# trois étapes plus loin par un « composer.json introuvable » incompréhensible.
+for fichier in composer.json composer.lock bin/console src/Kernel.php; do
+    [[ -f "$MSSUB_RACINE/$fichier" ]] || echouer "Le code n'a pas été déployé : $MSSUB_RACINE/$fichier est absent.
+   Vérifiez la source indiquée ($MSSUB_SOURCE) et la référence ($MSSUB_REFERENCE) :
+       git -C $MSSUB_RACINE log --oneline -1
+       ls -la $MSSUB_RACINE"
+done
+succes "Code présent et complet ($(git -C "$MSSUB_RACINE" log --oneline -1 2>/dev/null || echo 'sans dépôt'))"
 
 cd "$MSSUB_RACINE"
 
@@ -333,26 +396,26 @@ titre "5/9 — Dépendances"
 # APP_ENV=prod n'est pas décoratif : Composer enchaîne un cache:clear qui
 # démarre l'application, et sans cette variable elle chercherait les bundles de
 # développement que --no-dev vient de retirer.
-COMPOSER_ALLOW_SUPERUSER=1 APP_ENV=prod APP_DEBUG=0 \
-    composer install --no-dev --optimize-autoloader --no-interaction --quiet
-succes "Dépendances installées"
+export COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_NO_INTERACTION=1
+executer "Installation des dépendances (peut prendre une minute)" \
+    env APP_ENV=prod APP_DEBUG=0 composer install --no-dev --optimize-autoloader
 
 titre "6/9 — Base et ressources"
 
-php bin/console doctrine:migrations:migrate --no-interaction --env=prod --quiet
-succes "Migrations appliquées"
-
-php bin/console asset-map:compile --env=prod --quiet
-php bin/console cache:clear --env=prod --quiet
-php bin/console cache:warmup --env=prod --quiet
-succes "Ressources compilées et cache préparé"
+executer "Application des migrations" \
+    php bin/console doctrine:migrations:migrate --no-interaction --env=prod
+executer "Compilation des ressources" php bin/console asset-map:compile --env=prod
+executer "Préparation du cache" php bin/console cache:clear --env=prod
+php bin/console cache:warmup --env=prod >>"$JOURNAL" 2>&1 || true
 
 titre "7/9 — Compte administrateur"
 
 # Par l'entrée standard, jamais par --password : un argument de ligne de
 # commande est visible dans la liste des processus.
-printf '%s\n' "$MSSUB_ADMIN_MOTDEPASSE" \
-    | php bin/console app:user:create "$MSSUB_ADMIN" --admin --env=prod >/dev/null
+if ! printf '%s\n' "$MSSUB_ADMIN_MOTDEPASSE" \
+    | php bin/console app:user:create "$MSSUB_ADMIN" --admin --env=prod >>"$JOURNAL" 2>&1; then
+    echouer_avec_journal "Création du compte administrateur"
+fi
 succes "Compte administrateur « $MSSUB_ADMIN » créé"
 
 titre "8/9 — Droits"
@@ -417,24 +480,24 @@ cat > /etc/apache2/sites-available/mssub.conf <<VHOST
 </VirtualHost>
 VHOST
 
-a2enmod rewrite headers >/dev/null
-a2ensite mssub >/dev/null
-a2dissite 000-default >/dev/null 2>&1 || true
+a2enmod rewrite headers >>"$JOURNAL" 2>&1
+a2ensite mssub >>"$JOURNAL" 2>&1
+a2dissite 000-default >>"$JOURNAL" 2>&1 || true
 
 apachectl configtest 2>&1 | grep -q 'Syntax OK' || echouer "Configuration Apache invalide."
-systemctl reload apache2 >/dev/null 2>&1 || service apache2 restart >/dev/null 2>&1 || true
+systemctl reload apache2 >>"$JOURNAL" 2>&1 || service apache2 restart >>"$JOURNAL" 2>&1 || true
 succes "Apache configuré pour $MSSUB_DOMAINE"
 
 if [[ "$MSSUB_TLS" == "oui" ]]; then
     titre "Certificat TLS"
-    apt-get install -y -qq --no-install-recommends certbot python3-certbot-apache >/dev/null
+    executer "Installation de certbot" apt-get install -y -qq --no-install-recommends certbot python3-certbot-apache
     if certbot --apache --non-interactive --agree-tos \
-        --email "$MSSUB_TLS_COURRIEL" -d "$MSSUB_DOMAINE" >/dev/null 2>&1; then
+        --email "$MSSUB_TLS_COURRIEL" -d "$MSSUB_DOMAINE" >>"$JOURNAL" 2>&1; then
         # Le portail transporte des mots de passe : le cookie de session ne doit
         # plus circuler en clair une fois HTTPS en place.
         sed -i 's/^session.cookie_secure.*//' /etc/php/8.4/apache2/conf.d/99-mssub.ini
         echo 'session.cookie_secure = 1' >> /etc/php/8.4/apache2/conf.d/99-mssub.ini
-        systemctl reload apache2 >/dev/null 2>&1 || true
+        systemctl reload apache2 >>"$JOURNAL" 2>&1 || true
         succes "Certificat obtenu, cookies de session marqués « secure »"
     else
         alerte "Certbot a échoué — le portail reste en HTTP. Relancez : certbot --apache -d $MSSUB_DOMAINE"
@@ -480,6 +543,7 @@ cat <<FIN
      · configurer l'annuaire dans Administration → Annuaire, le cas échéant ;
      · charger votre plan existant par Import.
 
+   Journal de cette installation : $JOURNAL
    Mise à jour ultérieure : voir docs/installation-debian-13.md.
 FIN
 
