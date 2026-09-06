@@ -29,6 +29,7 @@ final class LdapDirectory
     public const KEYS = [
         'ldap.enabled', 'ldap.url', 'ldap.base_dn', 'ldap.search_dn',
         'ldap.search_password', 'ldap.uid_key', 'ldap.extra_filter',
+        'ldap.encryption', 'ldap.tls_verification', 'ldap.tls_ca',
     ];
 
     public function __construct(
@@ -89,6 +90,66 @@ final class LdapDirectory
     }
 
     /**
+     * Mode de chiffrement : « ldaps », « starttls » ou « aucun ».
+     *
+     * Par défaut il se déduit de l'URL, pour que les configurations existantes
+     * continuent de fonctionner sans qu'on ait à choisir quoi que ce soit.
+     */
+    private function encryption(): string
+    {
+        $configure = (string) $this->settings->get('ldap.encryption', '');
+        if ('' !== $configure) {
+            return $configure;
+        }
+
+        return str_starts_with(strtolower($this->url()), 'ldaps://') ? 'ldaps' : 'aucun';
+    }
+
+    /**
+     * Ouvre une connexion en appliquant le chiffrement demandé.
+     *
+     * Les options TLS sont posées globalement, et non sur la connexion : c'est
+     * une particularité d'OpenLDAP côté client, où une exigence de certificat
+     * définie après ldap_connect() n'est pas prise en compte. Les poser avant la
+     * connexion est la seule façon fiable de les faire respecter.
+     *
+     * Conséquence à connaître : ces réglages survivent à la requête et valent
+     * pour tout le processus. Sous mod_php ou PHP-FPM, un travailleur ayant
+     * servi une requête qui désactivait la vérification la garde désactivée
+     * jusqu'à son recyclage. Après avoir modifié ces réglages, un rechargement
+     * d'Apache est donc la seule façon d'être certain de ce qui s'applique.
+     */
+    private function ouvrir(): Ldap
+    {
+        $verification = (string) $this->settings->get('ldap.tls_verification', 'oui');
+        $autorite = (string) $this->settings->get('ldap.tls_ca', '');
+
+        if ('' !== $autorite) {
+            @ldap_set_option(null, \LDAP_OPT_X_TLS_CACERTFILE, $autorite);
+        }
+
+        if ('non' === $verification) {
+            // Le certificat n'est plus vérifié : la liaison reste chiffrée mais
+            // n'authentifie plus le serveur. À réserver à une mise au point.
+            @ldap_set_option(null, \LDAP_OPT_X_TLS_REQUIRE_CERT, \LDAP_OPT_X_TLS_NEVER);
+            $this->logger->warning('Vérification du certificat LDAP désactivée.');
+        } else {
+            @ldap_set_option(null, \LDAP_OPT_X_TLS_REQUIRE_CERT, \LDAP_OPT_X_TLS_DEMAND);
+        }
+
+        $configuration = ['connection_string' => $this->url()];
+
+        // StartTLS élève une connexion en clair sur le port 389. Le mode
+        // « ldaps » n'a rien à demander : le chiffrement est établi d'emblée par
+        // le schéma de l'URL.
+        if ('starttls' === $this->encryption()) {
+            $configuration['encryption'] = 'tls';
+        }
+
+        return Ldap::create('ext_ldap', $configuration);
+    }
+
+    /**
      * Vérifie que l'annuaire répond et que le compte de service est accepté.
      *
      * Sans ce contrôle depuis l'écran, une erreur de configuration ne se
@@ -100,20 +161,57 @@ final class LdapDirectory
     public function testConnection(): array
     {
         try {
-            $ldap = Ldap::create('ext_ldap', ['connection_string' => $this->url()]);
+            $ldap = $this->ouvrir();
             $ldap->bind($this->searchDn(), $this->searchPassword());
 
             $count = \count($ldap->query($this->baseDn(), \sprintf('(%s=*)', $this->uidKey()), ['maxItems' => 50])->execute());
 
             return [
                 'ok' => true,
-                'message' => \sprintf('Connexion établie. %d compte(s) visible(s) sous %s.', $count, $this->baseDn()),
+                'message' => \sprintf(
+                    'Connexion établie (%s). %d compte(s) visible(s) sous %s.',
+                    $this->encryption(),
+                    $count,
+                    $this->baseDn(),
+                ),
             ];
         } catch (ConnectionException $e) {
-            return ['ok' => false, 'message' => 'Annuaire injoignable : '.$e->getMessage()];
+            return ['ok' => false, 'message' => $this->expliquer($e->getMessage())];
         } catch (LdapException $e) {
-            return ['ok' => false, 'message' => 'Compte de service refusé : '.$e->getMessage()];
+            return ['ok' => false, 'message' => $this->expliquer($e->getMessage())];
         }
+    }
+
+    /**
+     * Traduit les échecs d'annuaire les plus courants en conduite à tenir.
+     *
+     * Les messages rendus par OpenLDAP et Active Directory décrivent la cause
+     * technique sans jamais dire quoi faire. Or celui qui les lit est en train
+     * de remplir un formulaire, pas de déboguer une pile réseau.
+     */
+    private function expliquer(string $message): string
+    {
+        $connu = [
+            'Strong(er) authentication required' => 'Le contrôleur de domaine refuse les liaisons non chiffrées. '
+                .'Passez l\'URL en « ldaps://serveur:636 », ou gardez le port 389 en choisissant le chiffrement StartTLS. '
+                .'C\'est le réglage par défaut d\'Active Directory depuis Windows Server 2019.',
+            'Can\'t contact LDAP server' => 'Serveur injoignable : vérifiez le nom, le port, et qu\'aucun pare-feu '
+                .'ne bloque (389 pour LDAP et StartTLS, 636 pour LDAPS). En LDAPS, cette erreur signale aussi '
+                .'un certificat rejeté — si l\'autorité est interne, indiquez-la ou désactivez la vérification le temps du test.',
+            'Invalid credentials' => 'Le compte de service est refusé : vérifiez son DN complet et son mot de passe. '
+                .'Sur Active Directory, le DN s\'écrit « CN=Service MSSub,OU=Comptes,DC=exemple,DC=local ».',
+            'Invalid DN syntax' => 'Le DN du compte de service ou la base de recherche est mal formé.',
+            'No such object' => 'La base de recherche n\'existe pas sur ce serveur : vérifiez « dc=... ».',
+            'Operations error' => 'Active Directory refuse une recherche anonyme : renseignez un compte de service.',
+        ];
+
+        foreach ($connu as $fragment => $conduite) {
+            if (str_contains($message, $fragment)) {
+                return $conduite."\n\nMessage du serveur : ".$message;
+            }
+        }
+
+        return 'Échec de la connexion : '.$message;
     }
 
     /**
@@ -130,7 +228,7 @@ final class LdapDirectory
         }
 
         try {
-            $ldap = Ldap::create('ext_ldap', ['connection_string' => $this->url()]);
+            $ldap = $this->ouvrir();
             $ldap->bind($this->searchDn(), $this->searchPassword());
 
             $entry = $this->findEntry($ldap, $username);

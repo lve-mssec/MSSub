@@ -82,11 +82,66 @@ il garde son mot de passe et ses rôles.
 
 | Champ | Remarque |
 | --- | --- |
-| Serveur | `ldap://serveur:389` ou `ldaps://serveur:636`. Préférez LDAPS. |
+| Serveur | `ldap://serveur:389` ou `ldaps://serveur:636`. |
+| Chiffrement | LDAPS, StartTLS, ou aucun. Voir ci-dessous. |
+| Vérification du certificat | À laisser active hors mise au point. |
+| Autorité de certification | Chemin d'un fichier PEM, si votre annuaire utilise une autorité interne. |
 | Base de recherche | `dc=exemple,dc=local` |
 | Compte de service | Sert à retrouver le DN d'un utilisateur et à lire ses groupes. Un compte en lecture seule suffit. |
 | Attribut d'identifiant | `uid` pour OpenLDAP, `sAMAccountName` pour Active Directory. |
 | Filtre additionnel | Facultatif, par exemple `(objectClass=user)`. |
+
+### Active Directory refuse les liaisons en clair
+
+Depuis Windows Server 2019, un contrôleur de domaine rejette par défaut les
+liaisons simples non chiffrées :
+
+```
+Strong(er) authentication required. The server requires binds to turn on
+integrity checking if SSL\TLS are not already active on the connection
+```
+
+Deux réponses, au choix : **LDAPS** (`ldaps://serveur:636`) ou **StartTLS**
+(`ldap://serveur:389` avec le chiffrement StartTLS). Les deux conviennent ; le
+second évite d'ouvrir un port supplémentaire.
+
+Vient alors le mur suivant, tout aussi systématique :
+
+```
+Can't contact LDAP server
+error:0A000086:SSL routines::certificate verify failed (self-signed certificate)
+```
+
+Le certificat du contrôleur est signé par l'autorité interne du domaine, que le
+serveur MSSub ne connaît pas. **La bonne réponse est de lui faire connaître
+cette autorité**, pas de renoncer à vérifier.
+
+Exporter le certificat de l'autorité depuis un contrôleur de domaine :
+
+```powershell
+certutil -ca.cert C:\ad-ca.crt
+```
+
+puis, sur le serveur MSSub, au choix :
+
+```bash
+# Soit pour tout le système — recommandé, cela vaut aussi pour les autres outils
+sudo cp ad-ca.crt /usr/local/share/ca-certificates/ad-interne.crt
+sudo update-ca-certificates
+
+# Soit pour MSSub seulement : indiquer le chemin dans le champ
+# « Autorité de certification » de l'écran Annuaire.
+```
+
+Le réglage « ne pas vérifier » existe pour dépanner. Il garde la liaison
+chiffrée mais cesse d'authentifier le serveur : n'importe quelle machine
+capable de se faire passer pour le contrôleur recevrait alors les mots de passe
+de vos utilisateurs. À ne pas laisser en place.
+
+> Ces options TLS sont **globales au processus** — une particularité du client
+> OpenLDAP. Après les avoir modifiées, rechargez Apache
+> (`sudo systemctl reload apache2`) : un travailleur déjà démarré conserverait
+> sinon les anciennes jusqu'à son recyclage.
 
 **Testez la connexion** avant de sortir de l'écran : le bouton vérifie que
 l'annuaire répond, que le compte de service est accepté, et compte les comptes

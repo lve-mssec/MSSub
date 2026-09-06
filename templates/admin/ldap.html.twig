@@ -14,7 +14,7 @@
     </div>
 
     {% if test %}
-        <div class="flash flash--{{ test.ok ? 'success' : 'error' }}">{{ test.message }}</div>
+        <div class="flash flash--{{ test.ok ? 'success' : 'error' }}" style="white-space: pre-line">{{ test.message }}</div>
     {% endif %}
 
     <div class="form-column">

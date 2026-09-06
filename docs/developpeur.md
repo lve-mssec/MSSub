@@ -21,6 +21,16 @@ docker compose --profile annuaire up -d
 Deux comptes : `jdupont` / `motdepasse1` (groupe `mssub-admins`) et `mmartin` /
 `motdepasse2` (`mssub-operateurs`).
 
+Pour exercer LDAPS et StartTLS — les seuls modes qu'accepte un Active Directory
+durci — il faut des certificats, engendrés localement et non versionnés :
+
+```bash
+./docker/openldap/engendrer-certificats.sh
+docker compose --profile annuaire up -d
+```
+
+Les tests correspondants s'ignorent d'eux-mêmes s'ils sont absents.
+
 ### Tests
 
 ```bash
@@ -183,6 +193,7 @@ Ils ont tous coûté du temps ; ils sont documentés ici pour ne pas être repay
 | **`DATABASE_URL`** | C'est une URL : un `@` ou un `#` non encodé dans le mot de passe fait échouer la connexion avec un `Access denied` qui n'a rien à voir. |
 | **Recipes Flex** | Le recipe Doctrine injecte un service PostgreSQL dans `compose.yaml` et une `DATABASE_URL` postgres *après* la vôtre dans `.env`. Relisez ces deux fichiers après tout `composer require`. |
 | **Collision Twig** | Une méthode `created()` et un accesseur `getCreated()` : Twig appelle la première et affiche du vide. Les incréments s'appellent `addCreated()`. |
+| **Options TLS d'OpenLDAP** | Elles sont globales au processus, pas attachées à la connexion : un test — ou une requête — qui pose une autorité la laisse en place pour les suivants. Les tests l'indiquent donc explicitement plutôt que de compter sur un état vierge. |
 | **Groupes LDAP** | Les lire après le *bind* utilisateur renvoie une liste vide — il n'a pas le droit de parcourir l'unité des groupes. Revenir au compte de service. |
 | **`AuthSource` par défaut** | Une entité `User` neuve vaut `Local`. Un garde-fou testant la seule source faisait naître les comptes d'annuaire « locaux » et sans mot de passe. |
 

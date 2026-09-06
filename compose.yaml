@@ -64,10 +64,25 @@ services:
       LDAP_ORGANISATION: MSSEC
       LDAP_DOMAIN: mssec.local
       LDAP_ADMIN_PASSWORD: adminpass
+      # TLS activé avec un certificat auto-signé : c'est ce qui permet
+      # d'exercer LDAPS et StartTLS, les seuls modes qu'accepte un Active
+      # Directory durci. Le certificat n'étant signé par personne, les tests
+      # désactivent sa vérification — ce que la production ne doit pas faire.
+      LDAP_TLS: "true"
+      LDAP_TLS_ENFORCE: "false"
+      LDAP_TLS_VERIFY_CLIENT: "never"
+      LDAP_TLS_CRT_FILENAME: ldap.crt
+      LDAP_TLS_KEY_FILENAME: ldap.key
+      LDAP_TLS_CA_CRT_FILENAME: ca.crt
     volumes:
       - ./docker/openldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-mssub.ldif:ro
+      # Engendrés par docker/openldap/engendrer-certificats.sh, non versionnés.
+      - ./docker/openldap/certs:/container/service/slapd/assets/certs:ro
     ports:
       - "1389:389"
+      # LDAPS, pour exercer le chemin chiffré : c'est celui qu'impose un
+      # Active Directory durci, donc celui qui doit être testé.
+      - "1636:636"
 
 volumes:
   db_data:

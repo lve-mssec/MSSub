@@ -23,6 +23,8 @@ final class LdapDirectoryTest extends TestCase
 
     private const URL = 'ldap://annuaire:389';
     private const BASE_DN = 'dc=mssec,dc=local';
+    private const AUTORITE = '/var/www/html/docker/openldap/certs/ca.crt';
+    private const AUTORITE_SYSTEME = '/etc/ssl/certs/ca-certificates.crt';
 
     protected function setUp(): void
     {
@@ -83,6 +85,106 @@ final class LdapDirectoryTest extends TestCase
         $directory = $this->directory(extraFilter: '(objectClass=organizationalUnit)');
 
         self::assertNull($directory->authenticate('jdupont', 'motdepasse1'));
+    }
+
+    /**
+     * Le cas que rencontre tout Active Directory : LDAPS avec un certificat
+     * signé par une autorité interne.
+     *
+     * Trois issues possibles, et il faut que les trois se comportent comme
+     * annoncé — c'est ce réglage qui décide si l'annuaire est joignable ou non.
+     */
+    public function testLdapsRefusesAnUnknownAuthority(): void
+    {
+        $this->skipSansCertificats();
+
+        // L'autorité du système est indiquée explicitement plutôt que laissée
+        // vide : les options TLS d'OpenLDAP étant globales au processus, un test
+        // précédent aurait sinon déjà posé la nôtre et celui-ci passerait.
+        $annuaire = $this->directoryTls([
+            'ldap.url' => 'ldaps://annuaire:636',
+            'ldap.tls_ca' => self::AUTORITE_SYSTEME,
+        ]);
+
+        self::assertNull($annuaire->authenticate('jdupont', 'motdepasse1'));
+        self::assertFalse($annuaire->testConnection()['ok']);
+    }
+
+    public function testLdapsAcceptsTheInternalAuthority(): void
+    {
+        $this->skipSansCertificats();
+
+        $annuaire = $this->directoryTls([
+            'ldap.url' => 'ldaps://annuaire:636',
+            'ldap.tls_ca' => self::AUTORITE,
+        ]);
+
+        self::assertSame('jdupont', $annuaire->authenticate('jdupont', 'motdepasse1')?->username);
+        self::assertTrue($annuaire->testConnection()['ok']);
+    }
+
+    /** Sans vérification, la liaison reste chiffrée mais n'authentifie plus le serveur. */
+    public function testLdapsWithoutVerification(): void
+    {
+        $this->skipSansCertificats();
+
+        $annuaire = $this->directoryTls([
+            'ldap.url' => 'ldaps://annuaire:636',
+            'ldap.tls_verification' => 'non',
+        ]);
+
+        self::assertSame('jdupont', $annuaire->authenticate('jdupont', 'motdepasse1')?->username);
+    }
+
+    /** StartTLS élève le port 389 en TLS : l'autre réponse à un annuaire durci. */
+    public function testStartTlsOnThePlainPort(): void
+    {
+        $this->skipSansCertificats();
+
+        $annuaire = $this->directoryTls([
+            'ldap.url' => 'ldap://annuaire:389',
+            'ldap.encryption' => 'starttls',
+            'ldap.tls_ca' => self::AUTORITE,
+        ]);
+
+        self::assertSame('jdupont', $annuaire->authenticate('jdupont', 'motdepasse1')?->username);
+    }
+
+    /** Le message d'un annuaire durci doit dire quoi faire, pas seulement ce qui a raté. */
+    public function testTheRefusalExplainsWhatToDo(): void
+    {
+        $this->skipSansCertificats();
+
+        $message = $this->directoryTls([
+            'ldap.url' => 'ldaps://annuaire:636',
+            'ldap.tls_ca' => self::AUTORITE_SYSTEME,
+        ])->testConnection()['message'];
+
+        self::assertStringContainsString('certificat', mb_strtolower($message));
+    }
+
+    /** @param array<string, string> $reglages */
+    private function directoryTls(array $reglages): LdapDirectory
+    {
+        return new LdapDirectory(
+            new NullLogger(),
+            $this->settingsAvec($reglages),
+            true,
+            self::URL,
+            self::BASE_DN,
+            'cn=admin,dc=mssec,dc=local',
+            'adminpass',
+            'uid',
+            '',
+        );
+    }
+
+    private function skipSansCertificats(): void
+    {
+        is_readable(self::AUTORITE) || self::markTestSkipped(
+            'Certificats absents — lancer : ./docker/openldap/engendrer-certificats.sh puis '
+            .'docker compose --profile annuaire up -d',
+        );
     }
 
     private function directory(

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Security;
 
+use App\Entity\Setting;
 use App\Repository\SettingRepository;
 use App\Service\SecretBox;
 use App\Service\Settings;
@@ -20,6 +21,29 @@ use Psr\Log\NullLogger;
  */
 trait EmptySettingsTrait
 {
+    /**
+     * Un magasin garni de valeurs, pour les tests qui portent justement dessus.
+     *
+     * @param array<string, string> $valeurs
+     */
+    private function settingsAvec(array $valeurs): Settings
+    {
+        $entites = [];
+        foreach ($valeurs as $nom => $valeur) {
+            $entites[$nom] = (new Setting($nom))->setValue($valeur);
+        }
+
+        $repository = $this->createStub(SettingRepository::class);
+        $repository->method('allIndexed')->willReturn($entites);
+
+        return new Settings(
+            $repository,
+            $this->createStub(EntityManagerInterface::class),
+            new SecretBox('secret-de-test'),
+            new NullLogger(),
+        );
+    }
+
     private function emptySettings(): Settings
     {
         // Des bouchons et non des simulacres : ces tests ne vérifient rien sur
