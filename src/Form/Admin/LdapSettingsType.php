@@ -54,6 +54,18 @@ final class LdapSettingsType extends AbstractType
                 'help' => 'Chemin d\'un fichier PEM, si votre annuaire utilise une autorité interne. '
                     .'Par exemple /usr/local/share/ca-certificates/ad-interne.crt',
             ])
+            ->add('groupes_imbriques', ChoiceType::class, [
+                'label' => 'Groupes imbriqués',
+                'required' => false,
+                'placeholder' => 'Résoudre (recommandé)',
+                'choices' => [
+                    'Résoudre toute la chaîne d\'appartenance' => 'oui',
+                    'Appartenance directe seulement' => 'non',
+                ],
+                'help' => 'Un compte est rarement membre direct du groupe qui porte le droit : '
+                    .'il passe par un groupe global, lui-même membre d\'un groupe local de domaine. '
+                    .'Sans résolution, ces comptes entrent en lecture seule.',
+            ])
             ->add('base_dn', TextType::class, [
                 'label' => 'Base de recherche',
                 'required' => false,

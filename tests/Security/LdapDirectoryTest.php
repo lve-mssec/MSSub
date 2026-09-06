@@ -56,7 +56,10 @@ final class LdapDirectoryTest extends TestCase
     public function testGroupsAreReadDespiteTheUserBind(): void
     {
         self::assertSame(['mssub-admins'], $this->directory()->authenticate('jdupont', 'motdepasse1')?->groups);
-        self::assertSame(['mssub-operateurs'], $this->directory()->authenticate('mmartin', 'motdepasse2')?->groups);
+
+        // mmartin en porte davantage depuis que l'imbrication est résolue ;
+        // ce test ne porte que sur la lecture, pas sur son étendue.
+        self::assertContains('mssub-operateurs', $this->directory()->authenticate('mmartin', 'motdepasse2')?->groups ?? []);
     }
 
     public function testWrongPasswordIsRefused(): void
@@ -202,6 +205,52 @@ final class LdapDirectoryTest extends TestCase
         ])->testConnection()['message'];
 
         self::assertStringContainsString('certificat', mb_strtolower($message));
+    }
+
+    /**
+     * L'appartenance indirecte doit compter.
+     *
+     * Le modèle recommandé par Microsoft place les comptes dans des groupes
+     * globaux, eux-mêmes membres de groupes locaux de domaine qui portent les
+     * droits : mmartin est dans GS-Reseau, lui-même dans
+     * LS-AdministrationReseau. S'arrêter à l'appartenance directe revient à
+     * n'accorder aucun droit à personne — c'est exactement ce que faisait la
+     * première version.
+     */
+    public function testNestedGroupMembershipIsResolved(): void
+    {
+        $groupes = $this->directory()->authenticate('mmartin', 'motdepasse2')?->groups ?? [];
+
+        self::assertContains('GS-Reseau', $groupes, 'Le groupe direct doit être là.');
+        self::assertContains('LS-AdministrationReseau', $groupes, 'Le groupe parent aussi.');
+        self::assertContains('mssub-operateurs', $groupes, 'Les autres appartenances directes restent.');
+    }
+
+    /** Sans imbrication, seule l'appartenance directe compte. */
+    public function testNestingCanBeTurnedOff(): void
+    {
+        $annuaire = $this->directoryTls([
+            'ldap.url' => self::URL,
+            'ldap.groupes_imbriques' => 'non',
+        ]);
+
+        $groupes = $annuaire->authenticate('mmartin', 'motdepasse2')?->groups ?? [];
+
+        self::assertContains('GS-Reseau', $groupes);
+        self::assertNotContains('LS-AdministrationReseau', $groupes);
+    }
+
+    /** Un compte sans imbrication ne doit pas être affecté par la remontée. */
+    public function testAFlatMembershipIsUnchanged(): void
+    {
+        self::assertSame(['mssub-admins'], $this->directory()->authenticate('jdupont', 'motdepasse1')?->groups);
+    }
+
+    public function testDiagnosisShowsTheNestedGroups(): void
+    {
+        $parEtape = array_column($this->directory()->diagnose('mmartin', 'motdepasse2'), null, 'etape');
+
+        self::assertStringContainsString('LS-AdministrationReseau', $parEtape['Groupes']['detail']);
     }
 
     /**

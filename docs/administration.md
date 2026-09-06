@@ -89,6 +89,7 @@ il garde son mot de passe et ses rôles.
 | Base de recherche | `dc=exemple,dc=local` |
 | Compte de service | Sert à retrouver le DN d'un utilisateur et à lire ses groupes. Voir les droits requis ci-dessous. |
 | Attribut d'identifiant | `uid` pour OpenLDAP, `sAMAccountName` pour Active Directory. |
+| Groupes imbriqués | Résoudre toute la chaîne d'appartenance, ou s'en tenir à l'appartenance directe. Voir ci-dessous. |
 | Filtre additionnel | Facultatif. `objectClass=user` et `(objectClass=user)` sont équivalents : les parenthèses extérieures sont ajoutées si vous les omettez. |
 
 ### Droits requis par le compte de service
@@ -237,6 +238,24 @@ local qui ne correspond pas. C'est délibéré — le compte de secours ne doit 
 pouvoir être absorbé par un homonyme du domaine — mais il faut le savoir. Le
 diagnostic le signale explicitement. Renommez ou supprimez le compte local si
 vous vouliez authentifier cette personne par l'annuaire.
+
+**Les groupes imbriqués.** `memberOf` ne liste que l'appartenance **directe**.
+Or le modèle recommandé par Microsoft place les comptes dans des groupes
+globaux, eux-mêmes membres de groupes locaux de domaine qui portent les
+droits :
+
+```
+toto  →  GS-Reseau  →  LS-AdministrationReseau  →  ROLE_ADMIN
+```
+
+`toto` n'est jamais membre direct de `LS-AdministrationReseau` : sans
+résolution de l'imbrication, il entre en lecture seule. MSSub résout la chaîne
+par défaut — par la règle transitive d'Active Directory quand elle est
+disponible, par une remontée de groupe en groupe sinon. Le diagnostic affiche
+tous les groupes retenus, directs comme hérités.
+
+Vous pouvez alors indiquer indifféremment le groupe global ou le groupe local
+dans la correspondance des rôles ; le second est le choix habituel.
 
 **Le filtre additionnel.** Il vient s'ajouter à la recherche par identifiant.
 Pour ne retenir que les comptes actifs d'un Active Directory :

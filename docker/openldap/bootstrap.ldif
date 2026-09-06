@@ -40,3 +40,20 @@ dn: cn=mssub-operateurs,ou=groups,dc=mssec,dc=local
 objectClass: groupOfNames
 cn: mssub-operateurs
 member: uid=mmartin,ou=users,dc=mssec,dc=local
+
+# Imbrication de groupes, à l'image du modèle recommandé par Microsoft : les
+# comptes vont dans des groupes globaux, eux-mêmes membres de groupes locaux de
+# domaine qui portent les droits. Un compte n'est alors jamais membre direct du
+# groupe auquel on accorde un rôle — s'arrêter au premier niveau n'accorderait
+# aucun droit à personne.
+#
+#   mmartin → GS-Reseau → LS-AdministrationReseau
+dn: cn=GS-Reseau,ou=groups,dc=mssec,dc=local
+objectClass: groupOfNames
+cn: GS-Reseau
+member: uid=mmartin,ou=users,dc=mssec,dc=local
+
+dn: cn=LS-AdministrationReseau,ou=groups,dc=mssec,dc=local
+objectClass: groupOfNames
+cn: LS-AdministrationReseau
+member: cn=GS-Reseau,ou=groups,dc=mssec,dc=local

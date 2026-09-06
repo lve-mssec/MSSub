@@ -32,7 +32,20 @@ final class LdapDirectory
         'ldap.enabled', 'ldap.url', 'ldap.base_dn', 'ldap.search_dn',
         'ldap.search_password', 'ldap.uid_key', 'ldap.extra_filter',
         'ldap.encryption', 'ldap.tls_verification', 'ldap.tls_ca',
+        'ldap.groupes_imbriques',
     ];
+
+    /**
+     * Règle de correspondance transitive d'Active Directory.
+     *
+     * Elle fait remonter au serveur toute la chaîne d'appartenance en une seule
+     * recherche. Spécifique à AD : les autres annuaires la refusent, d'où le
+     * repli en remontée récursive.
+     */
+    private const CHAINE_AD = '1.2.840.113556.1.4.1941';
+
+    /** Garde-fou de la remontée récursive : une hiérarchie de groupes est peu profonde. */
+    private const PROFONDEUR_MAX = 10;
 
     /** Conservé pour pouvoir interroger la connexion brute après un échec. */
     private ?Adapter $adaptateur = null;
@@ -650,25 +663,127 @@ final class LdapDirectory
      */
     private function groupsOf(Ldap $ldap, Entry $entry): array
     {
-        $dns = $entry->getAttribute('memberOf') ?? [];
+        $directs = array_map('strval', $entry->getAttribute('memberOf') ?? []);
 
-        if ([] === $dns) {
-            try {
-                $filter = \sprintf('(member=%s)', ldap_escape($entry->getDn(), '', \LDAP_ESCAPE_FILTER));
-                foreach ($ldap->query($this->baseDn(), $filter, ['maxItems' => 200])->execute() as $group) {
-                    $dns[] = $group->getDn();
-                }
-            } catch (LdapException $e) {
-                $this->logger->warning('Recherche des groupes LDAP impossible.', ['exception' => $e]);
+        if ([] === $directs) {
+            $directs = $this->groupesParent($ldap, $entry->getDn());
+        }
+
+        $tous = $directs;
+
+        if ($this->groupesImbriques()) {
+            // Un résultat vide n'est pas une réponse : plusieurs annuaires
+            // acceptent la syntaxe de la règle transitive sans savoir
+            // l'appliquer, et répondent zéro entrée sans la moindre erreur. La
+            // prendre pour argent comptant effacerait toutes les appartenances.
+            $chaine = $this->chaineAd($ldap, $entry->getDn()) ?? [];
+            $tous = array_merge($tous, $chaine);
+
+            if ([] === $chaine) {
+                $tous = array_merge($tous, $this->remonterLesGroupes($ldap, $directs));
             }
         }
 
-        $names = [];
-        foreach ($dns as $dn) {
-            $names[] = $this->commonName((string) $dn);
+        $noms = array_map(fn (string $dn): string => $this->commonName($dn), $tous);
+
+        return array_values(array_unique(array_filter($noms, 'strlen')));
+    }
+
+    /** L'imbrication est résolue par défaut : c'est le cas courant en entreprise. */
+    public function groupesImbriques(): bool
+    {
+        return 'non' !== (string) $this->settings->get('ldap.groupes_imbriques', 'oui');
+    }
+
+    /**
+     * Toute la chaîne d'appartenance, demandée au serveur.
+     *
+     * Renvoie null lorsque l'annuaire refuse la règle. Un tableau vide veut
+     * dire la même chose en pratique, et l'appelant traite les deux pareil.
+     *
+     * @return list<string>|null
+     */
+    private function chaineAd(Ldap $ldap, string $dn): ?array
+    {
+        try {
+            $filtre = \sprintf(
+                '(member:%s:=%s)',
+                self::CHAINE_AD,
+                ldap_escape($dn, '', \LDAP_ESCAPE_FILTER),
+            );
+
+            $trouves = [];
+            foreach ($ldap->query($this->baseDn(), $filtre, ['maxItems' => 500])->execute() as $groupe) {
+                $trouves[] = $groupe->getDn();
+            }
+
+            return $trouves;
+        } catch (LdapException $e) {
+            $this->logger->debug('Règle transitive indisponible ; remontée manuelle.', ['motif' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Remonte la hiérarchie de groupe en groupe, sur tout annuaire.
+     *
+     * Un groupe déjà visité n'est jamais revisité : une hiérarchie circulaire —
+     * qu'Active Directory interdit mais qu'une reprise de données peut produire
+     * ailleurs — ne ferait pas tourner la boucle indéfiniment.
+     *
+     * @param list<string> $depart
+     *
+     * @return list<string>
+     */
+    private function remonterLesGroupes(Ldap $ldap, array $depart): array
+    {
+        $vus = [];
+        $aVoir = $depart;
+
+        for ($profondeur = 0; $profondeur < self::PROFONDEUR_MAX && [] !== $aVoir; ++$profondeur) {
+            $suivants = [];
+
+            foreach ($aVoir as $dn) {
+                if (isset($vus[$dn])) {
+                    continue;
+                }
+                $vus[$dn] = true;
+
+                foreach ($this->groupesParent($ldap, $dn) as $parent) {
+                    if (!isset($vus[$parent])) {
+                        $suivants[] = $parent;
+                    }
+                }
+            }
+
+            $aVoir = $suivants;
         }
 
-        return array_values(array_unique(array_filter($names, 'strlen')));
+        return array_keys($vus);
+    }
+
+    /**
+     * Les groupes dont cet objet — compte ou groupe — est membre direct.
+     *
+     * @return list<string>
+     */
+    private function groupesParent(Ldap $ldap, string $dn): array
+    {
+        try {
+            $filtre = \sprintf('(member=%s)', ldap_escape($dn, '', \LDAP_ESCAPE_FILTER));
+
+            $parents = [];
+            foreach ($ldap->query($this->baseDn(), $filtre, ['maxItems' => 200])->execute() as $groupe) {
+                $parents[] = $groupe->getDn();
+            }
+
+            return $parents;
+        } catch (LdapException $e) {
+            $this->logger->warning('Recherche des groupes LDAP impossible.', ['exception' => $e]);
+
+            return [];
+        }
     }
 
     /** Extrait le CN d'un DN : « cn=admins,ou=groups,… » donne « admins ». */
