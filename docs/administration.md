@@ -105,9 +105,57 @@ Le deuxième est le plus insidieux : rien n'échoue. L'utilisateur se connecte,
 et se retrouve simplement sans droits — ce qui ressemble à une erreur de
 correspondance des rôles alors que la liste des groupes est vide.
 
-Sur Active Directory, `memberOf` n'est pas toujours lisible par défaut selon les
-délégations en place sur l'unité d'organisation. Déléguez explicitement la
-lecture au compte de service, sur l'OU qui contient les comptes.
+#### Déléguer ces lectures sur Active Directory
+
+`memberOf` est un attribut de **rétro-lien** : il n'est pas stocké sur le
+compte, il est calculé à partir de l'attribut `member` des groupes. Poser un
+droit sur le seul `memberOf` ne suffit donc généralement pas — c'est la lecture
+de `member` **sur les objets groupe** qui commande la visibilité. Déléguez les
+deux.
+
+Le plus simple, avec `dsacls` (livré avec les outils d'administration AD), qui
+résout les noms d'attributs sans qu'on ait à manipuler des GUID :
+
+```powershell
+# Lecture de memberOf sur les comptes de l'OU
+dsacls "OU=Comptes,DC=exemple,DC=local" /I:S /G "EXEMPLE\MSSub-Service:RP;memberOf;user"
+
+# Lecture de member sur les groupes — c'est celle qui compte réellement
+dsacls "OU=Groupes,DC=exemple,DC=local" /I:S /G "EXEMPLE\MSSub-Service:RP;member;group"
+```
+
+- `/I:S` applique aux objets enfants seulement, pas à l'OU elle-même ;
+- `RP` est le droit de lecture de propriété ;
+- le troisième champ restreint la délégation à une classe d'objets.
+
+Vérifier ce qui est en place :
+
+```powershell
+dsacls "OU=Groupes,DC=exemple,DC=local" | Select-String "MSSub-Service"
+```
+
+Retirer la délégation, si besoin : remplacer `/G` par `/R`.
+
+En PowerShell pur, si vous préférez scripter — le GUID de l'attribut est
+récupéré depuis le schéma plutôt que recopié, ce qui évite de se tromper :
+
+```powershell
+Import-Module ActiveDirectory
+$schema = (Get-ADRootDSE).schemaNamingContext
+
+$attribut = [guid](Get-ADObject -SearchBase $schema -Properties schemaIDGUID `
+    -Filter { lDAPDisplayName -eq 'member' }).schemaIDGUID
+$classe = [guid](Get-ADObject -SearchBase $schema -Properties schemaIDGUID `
+    -Filter { lDAPDisplayName -eq 'group' }).schemaIDGUID
+
+$sid = (Get-ADUser 'MSSub-Service').SID
+$chemin = 'AD:\OU=Groupes,DC=exemple,DC=local'
+
+$acl = Get-Acl -Path $chemin
+$acl.AddAccessRule((New-Object System.DirectoryServices.ActiveDirectoryAccessRule `
+    $sid, 'ReadProperty', 'Allow', $attribut, 'Descendents', $classe))
+Set-Acl -Path $chemin -AclObject $acl
+```
 
 Le diagnostic affiche les groupes réellement lus : une liste vide alors que
 l'utilisateur en a désigne ce droit manquant.
