@@ -163,6 +163,82 @@ final class LdapDirectoryTest extends TestCase
         self::assertStringContainsString('certificat', mb_strtolower($message));
     }
 
+    /**
+     * Le diagnostic doit dire où la chaîne casse.
+     *
+     * La page de connexion refuse volontairement de distinguer un compte absent
+     * d'un mot de passe faux, pour ne pas révéler quels identifiants existent.
+     * L'administrateur, lui, doit pouvoir le savoir : sans cela, un annuaire mal
+     * configuré est indiscernable d'un mot de passe erroné.
+     */
+    public function testDiagnosisNamesTheFailingStep(): void
+    {
+        $etapes = $this->directory()->diagnose('jdupont', 'pas-le-bon');
+        $parEtape = array_column($etapes, null, 'etape');
+
+        self::assertTrue($parEtape['Compte de service']['ok']);
+        self::assertTrue($parEtape['Recherche']['ok']);
+        self::assertFalse($parEtape['Mot de passe']['ok'], 'Le mot de passe est la seule étape en échec.');
+    }
+
+    public function testDiagnosisWalksTheWholeChain(): void
+    {
+        $etapes = $this->directory()->diagnose('jdupont', 'motdepasse1');
+        $parEtape = array_column($etapes, null, 'etape');
+
+        foreach (['Compte de service', 'Recherche', 'Attributs', 'Mot de passe', 'Groupes'] as $attendue) {
+            self::assertArrayHasKey($attendue, $parEtape);
+            self::assertTrue($parEtape[$attendue]['ok'], $attendue.' devrait aboutir.');
+        }
+
+        self::assertStringContainsString('uid=jdupont', $parEtape['Recherche']['detail']);
+        self::assertStringContainsString('mssub-admins', $parEtape['Groupes']['detail']);
+    }
+
+    /**
+     * Un compte introuvable est le symptôme le plus courant d'un attribut
+     * d'identifiant mal choisi : le diagnostic doit le dire, pas seulement
+     * constater l'absence.
+     */
+    public function testAnUnknownAccountPointsAtTheIdentifierAttribute(): void
+    {
+        $etapes = $this->directory()->diagnose('personne.ici');
+        $parEtape = array_column($etapes, null, 'etape');
+
+        self::assertFalse($parEtape['Recherche']['ok']);
+        self::assertStringContainsString('sAMAccountName', $parEtape['Recherche']['detail']);
+        self::assertArrayNotHasKey('Mot de passe', $parEtape, 'Inutile de vérifier un mot de passe sans compte.');
+    }
+
+    /** Sans mot de passe, le diagnostic s'arrête avant la vérification. */
+    public function testDiagnosisWithoutPasswordStopsBeforeTheBind(): void
+    {
+        $parEtape = array_column($this->directory()->diagnose('jdupont'), null, 'etape');
+
+        self::assertTrue($parEtape['Recherche']['ok']);
+        self::assertStringContainsString('Non vérifié', $parEtape['Mot de passe']['detail']);
+    }
+
+    public function testDiagnosisReportsAnUnusableServiceAccount(): void
+    {
+        $annuaire = new LdapDirectory(
+            new NullLogger(),
+            $this->emptySettings(),
+            true,
+            self::URL,
+            self::BASE_DN,
+            'cn=admin,dc=mssec,dc=local',
+            'mauvais-mot-de-passe',
+            'uid',
+            '',
+        );
+
+        $etapes = $annuaire->diagnose('jdupont', 'motdepasse1');
+
+        self::assertFalse($etapes[0]['ok']);
+        self::assertCount(1, $etapes, 'Sans compte de service, rien ne peut être tenté au-delà.');
+    }
+
     /** @param array<string, string> $reglages */
     private function directoryTls(array $reglages): LdapDirectory
     {

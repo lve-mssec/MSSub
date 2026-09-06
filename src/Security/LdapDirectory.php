@@ -183,6 +183,126 @@ final class LdapDirectory
     }
 
     /**
+     * Rejoue une authentification en rendant compte de chaque étape.
+     *
+     * Le message d'échec présenté à l'utilisateur est volontairement identique
+     * dans tous les cas : distinguer « ce compte n'existe pas » de « mot de
+     * passe faux » révélerait quels identifiants existent. Mais cette prudence
+     * prive l'administrateur de tout moyen de comprendre, alors qu'il est le
+     * seul à pouvoir corriger la configuration. D'où ce diagnostic, réservé à
+     * l'administration, qui dit exactement où la chaîne casse.
+     *
+     * @return list<array{etape: string, ok: bool, detail: string}>
+     */
+    public function diagnose(string $username, string $password = ''): array
+    {
+        $etapes = [];
+
+        if (!$this->isEnabled()) {
+            return [['etape' => 'Annuaire', 'ok' => false, 'detail' => 'L\'authentification par annuaire est désactivée.']];
+        }
+
+        try {
+            $ldap = $this->ouvrir();
+        } catch (LdapException $e) {
+            return [['etape' => 'Connexion', 'ok' => false, 'detail' => $this->expliquer($e->getMessage())]];
+        }
+
+        try {
+            $ldap->bind($this->searchDn(), $this->searchPassword());
+            $etapes[] = ['etape' => 'Compte de service', 'ok' => true, 'detail' => \sprintf(
+                'Liaison établie en %s avec %s.',
+                $this->encryption(),
+                $this->searchDn(),
+            )];
+        } catch (LdapException $e) {
+            $etapes[] = ['etape' => 'Compte de service', 'ok' => false, 'detail' => $this->expliquer($e->getMessage())];
+
+            return $etapes;
+        }
+
+        $filtre = \sprintf(
+            '(&(%s=%s)%s)',
+            $this->uidKey(),
+            ldap_escape($username, '', \LDAP_ESCAPE_FILTER),
+            $this->extraFilter(),
+        );
+
+        try {
+            $entrees = $ldap->query($this->baseDn(), $filtre, ['maxItems' => 5])->execute();
+            $nombre = \count($entrees);
+        } catch (LdapException $e) {
+            $etapes[] = ['etape' => 'Recherche', 'ok' => false, 'detail' => $this->expliquer($e->getMessage())];
+
+            return $etapes;
+        }
+
+        if (0 === $nombre) {
+            $etapes[] = ['etape' => 'Recherche', 'ok' => false, 'detail' => \sprintf(
+                "Aucune entrée pour le filtre %s sous %s.\n"
+                ."C'est la cause la plus fréquente d'un « identifiants invalides » alors que le compte existe : "
+                ."Active Directory nomme l'identifiant de connexion « sAMAccountName », là où OpenLDAP utilise « uid ». "
+                ."Vérifiez aussi que la base de recherche englobe l'unité d'organisation du compte.",
+                $filtre,
+                $this->baseDn(),
+            )];
+
+            return $etapes;
+        }
+
+        if ($nombre > 1) {
+            $etapes[] = ['etape' => 'Recherche', 'ok' => false, 'detail' => \sprintf(
+                '%d entrées correspondent à %s : l\'identifiant est ambigu et la connexion sera refusée. '
+                .'Restreignez la base de recherche ou ajoutez un filtre.',
+                $nombre,
+                $filtre,
+            )];
+
+            return $etapes;
+        }
+
+        $entree = $entrees[0];
+        $etapes[] = ['etape' => 'Recherche', 'ok' => true, 'detail' => \sprintf('Compte trouvé : %s', $entree->getDn())];
+
+        $etapes[] = ['etape' => 'Attributs', 'ok' => true, 'detail' => \sprintf(
+            'Nom affiché : %s — courriel : %s',
+            $this->attribute($entree, ['displayName', 'cn', 'givenName']) ?? '(absent)',
+            $this->attribute($entree, ['mail', 'userPrincipalName']) ?? '(absent)',
+        )];
+
+        if ('' === $password) {
+            $etapes[] = ['etape' => 'Mot de passe', 'ok' => true, 'detail' => 'Non vérifié : aucun mot de passe fourni.'];
+
+            return $etapes;
+        }
+
+        try {
+            $ldap->bind($entree->getDn(), $password);
+            $etapes[] = ['etape' => 'Mot de passe', 'ok' => true, 'detail' => 'Accepté par l\'annuaire.'];
+        } catch (LdapException $e) {
+            $etapes[] = ['etape' => 'Mot de passe', 'ok' => false, 'detail' =>
+                'Refusé par l\'annuaire : '.$e->getMessage()];
+
+            return $etapes;
+        }
+
+        // Retour au compte de service : l'utilisateur n'a généralement pas le
+        // droit de parcourir l'unité des groupes.
+        try {
+            $ldap->bind($this->searchDn(), $this->searchPassword());
+            $groupes = $this->groupsOf($ldap, $entree);
+            $etapes[] = ['etape' => 'Groupes', 'ok' => [] !== $groupes, 'detail' => [] === $groupes
+                ? 'Aucun groupe lu. Le compte entrera en lecture seule. Vérifiez que le compte de service '
+                    .'peut lire les groupes, et que la base de recherche les englobe.'
+                : implode(', ', $groupes)];
+        } catch (LdapException $e) {
+            $etapes[] = ['etape' => 'Groupes', 'ok' => false, 'detail' => $e->getMessage()];
+        }
+
+        return $etapes;
+    }
+
+    /**
      * Traduit les échecs d'annuaire les plus courants en conduite à tenir.
      *
      * Les messages rendus par OpenLDAP et Active Directory décrivent la cause

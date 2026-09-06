@@ -9,6 +9,8 @@ use App\Form\Admin\LdapSettingsType;
 use App\Form\Admin\OidcSettingsType;
 use App\Security\LdapDirectory;
 use App\Security\OidcClient;
+use App\Enum\AuthSource;
+use App\Repository\UserRepository;
 use App\Security\RoleMapper;
 use App\Service\Settings;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -59,6 +61,67 @@ final class SettingsController extends AbstractController
             'form' => $form,
             'test' => $test,
             'active' => $directory->isEnabled(),
+            'diagnostic' => null,
+        ]);
+    }
+
+    /**
+     * Rejoue une authentification et rend compte de chaque étape.
+     *
+     * La page de connexion refuse volontairement de dire pourquoi elle refuse.
+     * Cette prudence, juste pour un visiteur, prive l'administrateur du seul
+     * moyen de comprendre ce qui cloche — d'où cet écran, réservé à
+     * l'administration, qui montre où la chaîne casse.
+     */
+    #[Route('/annuaire/diagnostic', name: 'app_admin_ldap_diagnostic', methods: ['POST'])]
+    public function diagnostic(
+        Request $request,
+        LdapDirectory $directory,
+        UserRepository $users,
+        RoleMapper $roles,
+    ): Response {
+        if (!$this->isCsrfTokenValid('diagnostic', (string) $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Jeton de sécurité invalide.');
+        }
+
+        $identifiant = trim((string) $request->request->get('identifiant', ''));
+        $motDePasse = (string) $request->request->get('motdepasse', '');
+
+        if ('' === $identifiant) {
+            $this->addFlash('error', 'Indiquez un identifiant à diagnostiquer.');
+
+            return $this->redirectToRoute('app_admin_ldap');
+        }
+
+        $etapes = $directory->diagnose($identifiant, $motDePasse);
+
+        // Le compte local homonyme est l'autre cause classique : il court-circuite
+        // l'annuaire, et le mot de passe du domaine est alors comparé à un
+        // hachage local qui ne correspond pas.
+        $local = $users->findOneBy(['username' => $identifiant]);
+        $groupes = [];
+        foreach ($etapes as $etape) {
+            if ('Groupes' === $etape['etape'] && $etape['ok']) {
+                $groupes = array_map('trim', explode(',', $etape['detail']));
+            }
+        }
+
+        $form = $this->createForm(LdapSettingsType::class, $this->read(LdapDirectory::KEYS, 'ldap.'));
+
+        return $this->render('admin/ldap.html.twig', [
+            'nav' => 'admin',
+            'form' => $form,
+            'test' => null,
+            'active' => $directory->isEnabled(),
+            'diagnostic' => [
+                'identifiant' => $identifiant,
+                'etapes' => $etapes,
+                'compte_local' => $local instanceof \App\Entity\User && AuthSource::Local === $local->getAuthSource()
+                    ? $local
+                    : null,
+                'compte_existant' => $local,
+                'roles' => [] === $groupes ? [] : $roles->rolesFor($groupes),
+            ],
         ]);
     }
 

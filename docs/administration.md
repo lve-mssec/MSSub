@@ -143,6 +143,36 @@ de vos utilisateurs. À ne pas laisser en place.
 > (`sudo systemctl reload apache2`) : un travailleur déjà démarré conserverait
 > sinon les anciennes jusqu'à son recyclage.
 
+### « Identifiants invalides » alors que le compte existe
+
+La page de connexion refuse volontairement de dire *pourquoi* elle refuse :
+distinguer un compte absent d'un mot de passe faux révélerait quels
+identifiants existent. Cette prudence, juste pour un visiteur, prive
+l'administrateur de tout moyen de comprendre — d'où le **diagnostic** au bas de
+l'écran Annuaire.
+
+Saisissez un identifiant, éventuellement son mot de passe, et le diagnostic
+rejoue la chaîne étape par étape : compte de service, recherche, attributs lus,
+vérification du mot de passe, groupes, et rôles qui en découleraient.
+
+Les deux causes les plus fréquentes, quand « le compte est pourtant bon » :
+
+**L'attribut d'identifiant.** Active Directory nomme l'identifiant de connexion
+`sAMAccountName` ; OpenLDAP utilise `uid`. Avec le mauvais, la recherche ne
+trouve rien et la connexion est refusée sans que le mot de passe soit même
+soumis. Le diagnostic affiche le filtre exact employé.
+
+**Un compte local homonyme.** Un compte local porte le même identifiant : il
+prime sur l'annuaire, et le mot de passe du domaine est comparé à un hachage
+local qui ne correspond pas. C'est délibéré — le compte de secours ne doit pas
+pouvoir être absorbé par un homonyme du domaine — mais il faut le savoir. Le
+diagnostic le signale explicitement. Renommez ou supprimez le compte local si
+vous vouliez authentifier cette personne par l'annuaire.
+
+Vérifiez aussi que la **base de recherche** englobe l'unité d'organisation du
+compte : `dc=exemple,dc=local` couvre tout le domaine, `ou=Paris,dc=exemple,dc=local`
+ne couvre que Paris.
+
 **Testez la connexion** avant de sortir de l'écran : le bouton vérifie que
 l'annuaire répond, que le compte de service est accepté, et compte les comptes
 visibles. Sans cela, une erreur de configuration ne se découvrirait qu'à la

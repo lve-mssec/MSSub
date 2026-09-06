@@ -17,7 +17,68 @@
         <div class="flash flash--{{ test.ok ? 'success' : 'error' }}" style="white-space: pre-line">{{ test.message }}</div>
     {% endif %}
 
+    {% if diagnostic %}
+        <h2 class="section">Diagnostic de « {{ diagnostic.identifiant }} »</h2>
+
+        {% if diagnostic.compte_local %}
+            <div class="flash flash--error">
+                Un <strong>compte local</strong> porte déjà cet identifiant. Il prime sur l'annuaire :
+                le mot de passe saisi est comparé au hachage enregistré ici, jamais au domaine.
+                C'est délibéré — le compte de secours ne doit pas pouvoir être absorbé par un homonyme —
+                mais si vous vouliez authentifier ce compte par l'annuaire, renommez ou supprimez
+                le compte local dans <a href="{{ path('app_admin_user') }}">Comptes</a>.
+            </div>
+        {% endif %}
+
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Étape</th><th>État</th><th>Détail</th></tr></thead>
+                <tbody>
+                {% for etape in diagnostic.etapes %}
+                    <tr>
+                        <td>{{ etape.etape }}</td>
+                        <td><span class="pill pill--{{ etape.ok ? 'used' : 'na' }}">{{ etape.ok ? 'ok' : 'échec' }}</span></td>
+                        <td class="reason" style="white-space: pre-line">{{ etape.detail }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if diagnostic.roles is not empty %}
+            <div class="note" style="margin-top:12px">
+                Rôles qui seraient attribués : <strong>{{ diagnostic.roles|join(', ') }}</strong>
+            </div>
+        {% endif %}
+    {% endif %}
+
     <div class="form-column">
+        <h2 class="section">Diagnostiquer un compte</h2>
+
+        <form method="post" action="{{ path('app_admin_ldap_diagnostic') }}" class="card" style="margin-bottom:22px">
+            <input type="hidden" name="_token" value="{{ csrf_token('diagnostic') }}">
+
+            <div class="field">
+                <label for="identifiant">Identifiant à tester</label>
+                <input type="text" id="identifiant" name="identifiant" placeholder="jdupont">
+                <p class="field__help">
+                    Rejoue la recherche et, si vous fournissez le mot de passe, la vérification —
+                    en disant à quelle étape ça casse. La page de connexion, elle, reste
+                    volontairement muette : distinguer un compte absent d'un mot de passe faux
+                    révélerait quels identifiants existent.
+                </p>
+            </div>
+
+            <div class="field">
+                <label for="motdepasse">Mot de passe (facultatif)</label>
+                <input type="password" id="motdepasse" name="motdepasse" autocomplete="off">
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn--quiet" type="submit">Diagnostiquer</button>
+            </div>
+        </form>
+
         <div class="note" style="margin-bottom:16px">
             Le mot de passe n'est jamais comparé par MSSub : c'est l'annuaire qui tranche,
             par un bind avec les identifiants saisis. Aucun secret de compte utilisateur
