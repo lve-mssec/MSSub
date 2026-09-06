@@ -511,8 +511,10 @@ final class LdapDirectory
             $ldap->bind($this->searchDn(), $this->searchPassword());
             $groupes = $this->groupsOf($ldap, $entree);
             $etapes[] = ['etape' => 'Groupes', 'ok' => [] !== $groupes, 'detail' => [] === $groupes
-                ? 'Aucun groupe lu. Le compte entrera en lecture seule. Vérifiez que le compte de service '
-                    .'peut lire les groupes, et que la base de recherche les englobe.'
+                ? 'Aucun groupe lu : le compte entrera en lecture seule. '
+                    ."Vérifiez que le compte de service a le droit de lire l'attribut « memberOf » des comptes — "
+                    ."sans lui rien n'échoue, l'utilisateur se connecte simplement sans droits. "
+                    .'Vérifiez aussi que la base de recherche englobe les groupes.'
                 : implode(', ', $groupes)];
         } catch (LdapException $e) {
             $etapes[] = ['etape' => 'Groupes', 'ok' => false, 'detail' => $e->getMessage()];

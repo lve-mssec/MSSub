@@ -87,9 +87,30 @@ il garde son mot de passe et ses rôles.
 | Vérification du certificat | À laisser active hors mise au point. |
 | Autorité de certification | Chemin d'un fichier PEM, si votre annuaire utilise une autorité interne. |
 | Base de recherche | `dc=exemple,dc=local` |
-| Compte de service | Sert à retrouver le DN d'un utilisateur et à lire ses groupes. Un compte en lecture seule suffit. |
+| Compte de service | Sert à retrouver le DN d'un utilisateur et à lire ses groupes. Voir les droits requis ci-dessous. |
 | Attribut d'identifiant | `uid` pour OpenLDAP, `sAMAccountName` pour Active Directory. |
 | Filtre additionnel | Facultatif. `objectClass=user` et `(objectClass=user)` sont équivalents : les parenthèses extérieures sont ajoutées si vous les omettez. |
+
+### Droits requis par le compte de service
+
+Un compte sans privilège suffit, mais il lui faut trois lectures :
+
+| Droit | À quoi il sert | Sans lui |
+| --- | --- | --- |
+| **Read** sur les objets utilisateur, sous la base de recherche | Retrouver le DN à partir de l'identifiant | Aucun compte n'est trouvé : « identifiants invalides » pour tout le monde |
+| **Read** sur l'attribut **`memberOf`** des comptes | Lire l'appartenance aux groupes | La connexion réussit mais **tout le monde entre en lecture seule**, sans message d'erreur |
+| **Read** sur les objets groupe | Repli lorsque `memberOf` n'est pas exposé | Idem |
+
+Le deuxième est le plus insidieux : rien n'échoue. L'utilisateur se connecte,
+et se retrouve simplement sans droits — ce qui ressemble à une erreur de
+correspondance des rôles alors que la liste des groupes est vide.
+
+Sur Active Directory, `memberOf` n'est pas toujours lisible par défaut selon les
+délégations en place sur l'unité d'organisation. Déléguez explicitement la
+lecture au compte de service, sur l'OU qui contient les comptes.
+
+Le diagnostic affiche les groupes réellement lus : une liste vide alors que
+l'utilisateur en a désigne ce droit manquant.
 
 ### Active Directory refuse les liaisons en clair
 
