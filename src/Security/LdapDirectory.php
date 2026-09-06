@@ -84,9 +84,64 @@ final class LdapDirectory
         return '' === $key ? 'uid' : $key;
     }
 
+    /**
+     * Le filtre additionnel, ramené à une forme utilisable.
+     *
+     * Il est concaténé dans un « (&(uid=x)FILTRE) » et doit donc être
+     * parenthésé. Personne ne saisit spontanément « (objectClass=user) » avec
+     * ses parenthèses : la forme nue est la plus naturelle, et l'exiger
+     * produisait un filtre malformé que l'annuaire rejetait en bloc — toutes
+     * les connexions échouaient, pour une paire de parenthèses.
+     *
+     * Un filtre déséquilibré est écarté plutôt que transmis : mieux vaut une
+     * recherche trop large, qui fonctionne, qu'une requête invalide qui refuse
+     * tout le monde.
+     */
     private function extraFilter(): string
     {
-        return (string) $this->settings->get('ldap.extra_filter', $this->envExtraFilter);
+        $filtre = trim((string) $this->settings->get('ldap.extra_filter', $this->envExtraFilter));
+
+        if ('' === $filtre) {
+            return '';
+        }
+
+        if (!str_starts_with($filtre, '(')) {
+            $filtre = '('.$filtre.')';
+        }
+
+        if (!$this->parenthesesEquilibrees($filtre)) {
+            $this->logger->error('Filtre LDAP additionnel déséquilibré : ignoré.', ['filtre' => $filtre]);
+
+            return '';
+        }
+
+        return $filtre;
+    }
+
+    private function parenthesesEquilibrees(string $filtre): bool
+    {
+        $profondeur = 0;
+
+        for ($i = 0, $n = \strlen($filtre); $i < $n; ++$i) {
+            $caractere = $filtre[$i];
+
+            // Une parenthèse échappée ne compte pas : « \28 » et « \29 » sont
+            // les formes littérales admises par la RFC 4515.
+            if ('\\' === $caractere) {
+                ++$i;
+                continue;
+            }
+
+            if ('(' === $caractere) {
+                ++$profondeur;
+            } elseif (')' === $caractere) {
+                if (--$profondeur < 0) {
+                    return false;
+                }
+            }
+        }
+
+        return 0 === $profondeur;
     }
 
     /**
@@ -323,6 +378,9 @@ final class LdapDirectory
             'Invalid DN syntax' => 'Le DN du compte de service ou la base de recherche est mal formé.',
             'No such object' => 'La base de recherche n\'existe pas sur ce serveur : vérifiez « dc=... ».',
             'Operations error' => 'Active Directory refuse une recherche anonyme : renseignez un compte de service.',
+            'Bad search filter' => 'Le filtre de recherche est invalide. Vérifiez le filtre additionnel : '
+                .'il doit être une expression complète, par exemple « objectClass=user » ou '
+                .'« (&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2))) ».',
         ];
 
         foreach ($connu as $fragment => $conduite) {

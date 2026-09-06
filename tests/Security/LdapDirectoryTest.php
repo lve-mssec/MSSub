@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Security;
 
 use App\Security\LdapDirectory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -77,6 +78,46 @@ final class LdapDirectoryTest extends TestCase
     public function testDisabledDirectoryNeverAuthenticates(): void
     {
         self::assertNull($this->directory(enabled: false)->authenticate('jdupont', 'motdepasse1'));
+    }
+
+    /**
+     * Le filtre additionnel doit accepter la forme nue.
+     *
+     * Il est concaténé dans « (&(uid=x)FILTRE) » et doit donc être parenthésé.
+     * Exiger de l'opérateur qu'il tape lui-même les parenthèses produisait
+     * « (&(sAMAccountName=X)objectClass=user) » — invalide, et rejeté en bloc
+     * par l'annuaire : toutes les connexions échouaient pour une paire de
+     * parenthèses.
+     */
+    #[DataProvider('provideFiltres')]
+    public function testTheExtraFilterAcceptsBothForms(string $saisi, bool $trouveAttendu): void
+    {
+        $this->skipSansCertificats();
+
+        $annuaire = $this->directoryTls([
+            'ldap.url' => self::URL,
+            'ldap.extra_filter' => $saisi,
+        ]);
+
+        $identite = $annuaire->authenticate('jdupont', 'motdepasse1');
+
+        $trouveAttendu
+            ? self::assertNotNull($identite, \sprintf('Le filtre « %s » devrait laisser passer.', $saisi))
+            : self::assertNull($identite, \sprintf('Le filtre « %s » devrait exclure.', $saisi));
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function provideFiltres(): iterable
+    {
+        yield 'forme nue' => ['objectClass=inetOrgPerson', true];
+        yield 'forme parenthésée' => ['(objectClass=inetOrgPerson)', true];
+        yield 'espaces superflus' => ['  objectClass=inetOrgPerson  ', true];
+        yield 'expression composée' => ['(&(objectClass=inetOrgPerson)(uid=jdupont))', true];
+        yield 'filtre excluant' => ['(objectClass=organizationalUnit)', false];
+        yield 'aucun filtre' => ['', true];
+        // Un filtre déséquilibré est écarté : la recherche est trop large, mais
+        // elle fonctionne — au lieu de refuser tout le monde.
+        yield 'parenthèse manquante' => ['(objectClass=inetOrgPerson', true];
     }
 
     /** Le filtre additionnel doit réellement restreindre le périmètre. */

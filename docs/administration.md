@@ -89,7 +89,7 @@ il garde son mot de passe et ses rôles.
 | Base de recherche | `dc=exemple,dc=local` |
 | Compte de service | Sert à retrouver le DN d'un utilisateur et à lire ses groupes. Un compte en lecture seule suffit. |
 | Attribut d'identifiant | `uid` pour OpenLDAP, `sAMAccountName` pour Active Directory. |
-| Filtre additionnel | Facultatif, par exemple `(objectClass=user)`. |
+| Filtre additionnel | Facultatif. `objectClass=user` et `(objectClass=user)` sont équivalents : les parenthèses extérieures sont ajoutées si vous les omettez. |
 
 ### Active Directory refuse les liaisons en clair
 
@@ -168,6 +168,17 @@ local qui ne correspond pas. C'est délibéré — le compte de secours ne doit 
 pouvoir être absorbé par un homonyme du domaine — mais il faut le savoir. Le
 diagnostic le signale explicitement. Renommez ou supprimez le compte local si
 vous vouliez authentifier cette personne par l'annuaire.
+
+**Le filtre additionnel.** Il vient s'ajouter à la recherche par identifiant.
+Pour ne retenir que les comptes actifs d'un Active Directory :
+
+```
+(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))
+```
+
+Un filtre aux parenthèses déséquilibrées est ignoré, avec une trace dans les
+journaux : une recherche trop large fonctionne, une requête invalide refuserait
+tout le monde. Le diagnostic affiche le filtre réellement employé.
 
 Vérifiez aussi que la **base de recherche** englobe l'unité d'organisation du
 compte : `dc=exemple,dc=local` couvre tout le domaine, `ou=Paris,dc=exemple,dc=local`

@@ -80,7 +80,10 @@ final class LdapSettingsType extends AbstractType
             ->add('extra_filter', TextType::class, [
                 'label' => 'Filtre additionnel',
                 'required' => false,
-                'help' => 'Facultatif, par exemple (objectClass=user) pour restreindre aux comptes.',
+                'help' => 'Facultatif. Les parenthèses extérieures sont ajoutées si vous les omettez : '
+                    .'« objectClass=user » et « (objectClass=user) » sont équivalents. '
+                    .'Pour ne retenir que les comptes actifs d\'un Active Directory : '
+                    .'(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))',
             ]);
     }
 
