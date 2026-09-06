@@ -7,6 +7,8 @@ namespace App\Security;
 use App\Service\Settings;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Ldap\Adapter\ExtLdap\Adapter;
+use Symfony\Component\Ldap\Adapter\ExtLdap\Connection as ExtConnection;
 use Symfony\Component\Ldap\Entry;
 use Symfony\Component\Ldap\Exception\ConnectionException;
 use Symfony\Component\Ldap\Exception\ExceptionInterface as LdapException;
@@ -31,6 +33,9 @@ final class LdapDirectory
         'ldap.search_password', 'ldap.uid_key', 'ldap.extra_filter',
         'ldap.encryption', 'ldap.tls_verification', 'ldap.tls_ca',
     ];
+
+    /** Conservé pour pouvoir interroger la connexion brute après un échec. */
+    private ?Adapter $adaptateur = null;
 
     public function __construct(
         private readonly LoggerInterface $logger,
@@ -201,7 +206,161 @@ final class LdapDirectory
             $configuration['encryption'] = 'tls';
         }
 
-        return Ldap::create('ext_ldap', $configuration);
+        // L'adaptateur est construit à la main plutôt que par Ldap::create() :
+        // il donne accès à la connexion brute, seule façon de lire le message de
+        // diagnostic du serveur. Symfony le lit puis le jette lorsque l'erreur
+        // est « Invalid credentials » — or c'est précisément là qu'Active
+        // Directory explique son refus.
+        $adaptateur = new Adapter($configuration);
+        $this->adaptateur = $adaptateur;
+
+        return new Ldap($adaptateur);
+    }
+
+    /**
+     * Ce qu'Active Directory dit de l'état du compte.
+     *
+     * Un mot de passe qui ouvre une session Windows mais que l'annuaire refuse
+     * en liaison simple n'est pas un mot de passe faux : c'est presque toujours
+     * une restriction portée par le compte. Le compte de service peut la lire —
+     * autant la montrer plutôt que de laisser deviner.
+     *
+     * Renvoie null sur un annuaire qui n'expose pas ces attributs, OpenLDAP par
+     * exemple : il n'y a alors rien à dire.
+     *
+     * Publique parce que c'est une fonction pure de l'entrée : cela permet de
+     * la vérifier sur des comptes fictifs portant chaque restriction, sans
+     * dépendre d'un annuaire qui les expose.
+     *
+     * @return array{etape: string, ok: bool, detail: string}|null
+     */
+    public function etatDuCompte(Entry $entree): ?array
+    {
+        $controle = $entree->getAttribute('userAccountControl')[0] ?? null;
+        $postes = $entree->getAttribute('logonWorkstations')[0] ?? null;
+        $groupes = $entree->getAttribute('memberOf') ?? [];
+
+        if (null === $controle && null === $postes && [] === $groupes) {
+            return null;
+        }
+
+        $constats = [];
+        $bloquant = false;
+
+        if (null !== $controle) {
+            // Bits documentés par Microsoft ; seuls ceux qui empêchent une
+            // liaison simple sont retenus.
+            $drapeaux = [
+                0x0002 => 'le compte est désactivé',
+                0x0010 => 'le compte est verrouillé',
+                0x0040 => 'le mot de passe ne peut pas être changé',
+                0x40000 => 'une carte à puce est exigée : la liaison par mot de passe est alors toujours refusée',
+                0x800000 => 'le mot de passe a expiré',
+            ];
+
+            foreach ($drapeaux as $bit => $libelle) {
+                if (((int) $controle & $bit) === $bit) {
+                    $constats[] = $libelle;
+                    if (0x0040 !== $bit) {
+                        $bloquant = true;
+                    }
+                }
+            }
+        }
+
+        if (null !== $postes && '' !== trim($postes)) {
+            $constats[] = \sprintf(
+                'la connexion est restreinte aux postes « %s » — si le serveur MSSub n\'y figure pas, '
+                .'toute liaison depuis celui-ci sera refusée alors que la session Windows fonctionne',
+                $postes,
+            );
+            $bloquant = true;
+        }
+
+        foreach ($groupes as $groupe) {
+            if (str_contains(mb_strtolower((string) $groupe), 'protected users')) {
+                $constats[] = 'le compte appartient au groupe « Protected Users », '
+                    .'qui interdit l\'authentification par liaison simple LDAP';
+                $bloquant = true;
+            }
+        }
+
+        if ([] === $constats) {
+            return ['etape' => 'État du compte', 'ok' => true, 'detail' => 'Aucune restriction lue sur le compte.'];
+        }
+
+        return [
+            'etape' => 'État du compte',
+            'ok' => !$bloquant,
+            'detail' => ucfirst(implode(" ;\n", $constats)).'.',
+        ];
+    }
+
+    /**
+     * Le message de diagnostic du serveur après un échec.
+     *
+     * Active Directory y place un code qui distingue un mot de passe faux d'un
+     * compte désactivé, expiré, verrouillé, ou interdit à cette heure — autant
+     * de situations qu'un simple « identifiants invalides » confond.
+     */
+    private function messageDiagnostic(): ?string
+    {
+        $connexion = $this->adaptateur?->getConnection();
+
+        if (!$connexion instanceof ExtConnection) {
+            return null;
+        }
+
+        $ressource = $connexion->getResource();
+        if (null === $ressource) {
+            return null;
+        }
+
+        $message = '';
+        @ldap_get_option($ressource, \LDAP_OPT_DIAGNOSTIC_MESSAGE, $message);
+
+        return '' === $message ? null : $message;
+    }
+
+    /**
+     * Traduit le code de refus d'Active Directory.
+     *
+     * Ces codes hexadécimaux sont documentés par Microsoft mais illisibles pour
+     * qui n'a pas la table sous les yeux ; or ils portent toute l'information.
+     */
+    private function expliquerRefus(?string $diagnostic): string
+    {
+        if (null === $diagnostic) {
+            return "Refusé par l'annuaire, sans précision — c'est le cas d'OpenLDAP, "
+                ."qui ne détaille jamais un refus.\n\n"
+                ."Si le mot de passe ouvre bien une session Windows, ce n'est probablement pas lui : "
+                ."regardez l'étape « État du compte » ci-dessus, et le journal de sécurité du contrôleur "
+                ."de domaine (événement 4625, dont le sous-état donne la raison exacte).";
+        }
+
+        $codes = [
+            '525' => 'ce compte n\'existe pas.',
+            '52e' => 'le mot de passe est incorrect pour ce compte. '
+                .'Vérifiez que l\'identifiant recherché désigne bien la même personne '
+                .'que le mot de passe saisi — la recherche a pu trouver un homonyme.',
+            '530' => 'la connexion n\'est pas autorisée à cette heure-ci pour ce compte.',
+            '531' => 'la connexion n\'est pas autorisée depuis ce poste. '
+                .'L\'attribut « logonWorkstations » du compte restreint les machines, '
+                .'et le serveur MSSub n\'en fait pas partie.',
+            '532' => 'le mot de passe a expiré.',
+            '533' => 'le compte est désactivé.',
+            '701' => 'le compte a expiré.',
+            '773' => 'le compte doit changer son mot de passe avant de pouvoir s\'authentifier.',
+            '775' => 'le compte est verrouillé, probablement après plusieurs échecs.',
+        ];
+
+        foreach ($codes as $code => $explication) {
+            if (1 === preg_match('/data\s+'.$code.'\b/i', $diagnostic)) {
+                return 'Refusé par l\'annuaire : '.$explication."\n\nMessage du serveur : ".$diagnostic;
+            }
+        }
+
+        return 'Refusé par l\'annuaire.'."\n\nMessage du serveur : ".$diagnostic;
     }
 
     /**
@@ -319,6 +478,11 @@ final class LdapDirectory
         $entree = $entrees[0];
         $etapes[] = ['etape' => 'Recherche', 'ok' => true, 'detail' => \sprintf('Compte trouvé : %s', $entree->getDn())];
 
+        $etat = $this->etatDuCompte($entree);
+        if (null !== $etat) {
+            $etapes[] = $etat;
+        }
+
         $etapes[] = ['etape' => 'Attributs', 'ok' => true, 'detail' => \sprintf(
             'Nom affiché : %s — courriel : %s',
             $this->attribute($entree, ['displayName', 'cn', 'givenName']) ?? '(absent)',
@@ -335,8 +499,8 @@ final class LdapDirectory
             $ldap->bind($entree->getDn(), $password);
             $etapes[] = ['etape' => 'Mot de passe', 'ok' => true, 'detail' => 'Accepté par l\'annuaire.'];
         } catch (LdapException $e) {
-            $etapes[] = ['etape' => 'Mot de passe', 'ok' => false, 'detail' =>
-                'Refusé par l\'annuaire : '.$e->getMessage()];
+            $etapes[] = ['etape' => 'Mot de passe', 'ok' => false,
+                'detail' => $this->expliquerRefus($this->messageDiagnostic())];
 
             return $etapes;
         }
@@ -438,7 +602,13 @@ final class LdapDirectory
 
             return null;
         } catch (LdapException $e) {
-            $this->logger->info('Authentification LDAP refusée.', ['utilisateur' => $username, 'motif' => $e->getMessage()]);
+            // Le motif détaillé n'est jamais rendu à l'utilisateur — il dirait
+            // si le compte existe — mais il a toute sa place dans les journaux.
+            $this->logger->info('Authentification LDAP refusée.', [
+                'utilisateur' => $username,
+                'motif' => $e->getMessage(),
+                'diagnostic' => $this->messageDiagnostic(),
+            ]);
 
             return null;
         }

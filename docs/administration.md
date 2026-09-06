@@ -180,6 +180,24 @@ Un filtre aux parenthèses déséquilibrées est ignoré, avec une trace dans le
 journaux : une recherche trop large fonctionne, une requête invalide refuserait
 tout le monde. Le diagnostic affiche le filtre réellement employé.
 
+**Le mot de passe est refusé alors qu'il ouvre une session Windows.** Ce n'est
+alors presque jamais le mot de passe, mais une restriction portée par le
+compte. Le diagnostic les lit et les nomme :
+
+| Restriction | Effet |
+| --- | --- |
+| Groupe **Protected Users** | Interdit l'authentification par liaison simple LDAP. C'est le cas le plus déroutant : la session Windows fonctionne, l'annuaire refuse. |
+| `logonWorkstations` | Le compte n'est autorisé que depuis certains postes ; le serveur MSSub n'en fait pas partie. |
+| Carte à puce exigée | La liaison par mot de passe est toujours refusée, quel que soit le mot de passe. |
+| Compte désactivé, verrouillé, ou mot de passe expiré | Explicites. |
+
+Pour **Protected Users**, ne retirez pas vos administrateurs du groupe : il est
+là pour de bonnes raisons. Deux réponses saines :
+
+- faire entrer ces personnes par le **SSO OIDC** plutôt que par l'annuaire —
+  c'est la voie prévue pour les comptes à privilèges ;
+- réserver l'authentification LDAP aux comptes qui ne sont pas dans ce groupe.
+
 Vérifiez aussi que la **base de recherche** englobe l'unité d'organisation du
 compte : `dc=exemple,dc=local` couvre tout le domaine, `ou=Paris,dc=exemple,dc=local`
 ne couvre que Paris.
