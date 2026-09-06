@@ -18,8 +18,14 @@ sudo ./deploy/installer-debian-13.sh
 ```
 
 Script d'installation pour Debian 13 : toutes les questions d'abord, puis
-l'installation complète sans interruption. Voir
-[docs/installation-debian-13.md](docs/installation-debian-13.md).
+l'installation complète sans interruption.
+
+```bash
+sudo ./deploy/mettre-a-jour.sh          # mise à jour, sauvegarde comprise
+sudo ./deploy/mettre-a-jour.sh v1.3.0   # ou retour à une version précise
+```
+
+Voir [docs/installation-debian-13.md](docs/installation-debian-13.md).
 
 ## Démarrage
 

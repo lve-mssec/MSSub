@@ -382,6 +382,34 @@ existant.
 ## Mise à jour
 
 ```bash
+sudo /var/www/mssub/deploy/mettre-a-jour.sh            # dernière version de la branche
+sudo /var/www/mssub/deploy/mettre-a-jour.sh v1.3.0     # une version précise
+```
+
+Le script sauvegarde la base, reprend le code, applique les migrations,
+recompile les ressources, réapplique les droits et recharge Apache — puis
+vérifie que le portail répond encore. Il affiche à la fin la commande de retour
+arrière, version et sauvegarde nommées.
+
+Le rechargement d'Apache n'est pas cosmétique : `opcache.validate_timestamps`
+vaut zéro en production, et les options TLS du client LDAP sont globales au
+processus. Sans rechargement, un travailleur déjà démarré continuerait
+d'exécuter l'ancien code avec les anciens réglages.
+
+### Retour arrière
+
+```bash
+sudo /var/www/mssub/deploy/mettre-a-jour.sh <version-précédente>
+gunzip -c /var/backups/mssub-<horodatage>.sql.gz | mysql -u mssub -p mssub
+```
+
+Revenir sur la branche ensuite : `sudo ./deploy/mettre-a-jour.sh main`.
+
+### Manuellement
+
+Les mêmes gestes, un par un :
+
+```bash
 cd /var/www/mssub
 
 # Toujours avant une migration : elle n'est pas réversible sans sauvegarde.
