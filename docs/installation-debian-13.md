@@ -381,6 +381,37 @@ existant.
 
 ## Mise à jour
 
+### La première fois
+
+Le script de mise à jour vit dans le dépôt : il ne peut donc pas se déployer
+lui-même sur une instance qui ne l'a pas encore. Il faut aller le chercher une
+fois, à la main :
+
+```bash
+sudo git -C /var/www/mssub config --global --add safe.directory /var/www/mssub
+sudo git -C /var/www/mssub fetch --all --tags
+
+# On ne récupère que le répertoire deploy/, pas tout le code : le script se
+# chargera du reste dans les règles, sauvegarde comprise.
+sudo git -C /var/www/mssub checkout v1.4.0 -- deploy/
+
+sudo /var/www/mssub/deploy/mettre-a-jour.sh v1.4.0
+```
+
+Ensuite, plus rien à faire à la main : **le script se relance de lui-même**
+lorsqu'une mise à jour le modifie, afin que la nouvelle version du code soit
+déployée par la nouvelle procédure et non par l'ancienne. La sortie l'annonce :
+
+```
+✓ Bascule sur v1.5.0
+Le script de mise à jour a lui-même changé : reprise avec la nouvelle version.
+```
+
+Une seconde sauvegarde est prise au passage ; les deux précédant les
+migrations, elles valent la même chose.
+
+### Ensuite
+
 ```bash
 sudo /var/www/mssub/deploy/mettre-a-jour.sh            # dernière version de la branche
 sudo /var/www/mssub/deploy/mettre-a-jour.sh v1.3.0     # une version précise

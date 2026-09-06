@@ -27,6 +27,10 @@ succes()  { printf '   %s✓%s %s\n' "$VERT" "$NORMAL" "$1"; }
 alerte()  { printf '   %s!%s %s\n' "$ORANGE" "$NORMAL" "$1"; }
 echouer() { printf '\n%s✗ %s%s\n\n' "$ROUGE" "$1" "$NORMAL" >&2; exit 1; }
 
+# Chemin absolu résolu tout de suite : le script se déplace dans l'arborescence
+# et pourrait être remplacé sous ses propres pieds par la mise à jour.
+SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+
 RACINE="${MSSUB_RACINE:-/var/www/mssub}"
 JOURNAL="${MSSUB_JOURNAL:-/var/log/mssub-mise-a-jour.log}"
 REFERENCE="${1:-}"
@@ -67,6 +71,7 @@ chmod 600 "$JOURNAL"
 
 cd "$RACINE"
 version_avant="$(git describe --tags --always 2>/dev/null || git rev-parse --short HEAD)"
+empreinte_avant="$(sha256sum "$SCRIPT" | cut -d' ' -f1)"
 info "Version installée : $version_avant"
 detail "Journal détaillé : $JOURNAL"
 
@@ -140,6 +145,20 @@ else
 fi
 
 version_apres="$(git describe --tags --always 2>/dev/null || git rev-parse --short HEAD)"
+
+# Le script vient peut-être de se mettre à jour lui-même. Poursuivre avec la
+# version chargée en mémoire déploierait la nouvelle version du code avec
+# l'ancienne procédure — et priverait cette instance de toute correction
+# apportée au déploiement lui-même. On repart donc avec la nouvelle.
+#
+# La garde évite la boucle : la relance ne se relance pas. Une seconde
+# sauvegarde est prise au passage — les deux précèdent les migrations, elles
+# valent donc la même chose, et une sauvegarde de trop n'a jamais nui.
+if [[ -z "${MSSUB_RELANCE:-}" ]] && [[ "$empreinte_avant" != "$(sha256sum "$SCRIPT" | cut -d' ' -f1)" ]]; then
+    info "Le script de mise à jour a lui-même changé : reprise avec la nouvelle version."
+    export MSSUB_RELANCE=1
+    exec "$SCRIPT" "$@"
+fi
 
 if [[ "$version_avant" == "$version_apres" ]]; then
     info "Déjà à jour ($version_apres) — les étapes suivantes restent jouées."
